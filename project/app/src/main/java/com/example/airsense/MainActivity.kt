@@ -6,11 +6,11 @@ import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
 import android.os.Bundle
-import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.material.Button
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Surface
 import androidx.compose.material.Text
@@ -25,25 +25,18 @@ import com.example.airsense.ui.theme.AirsenseTheme
 class MainActivity : ComponentActivity(), SensorEventListener {
     private lateinit var sensorManager: SensorManager
     private lateinit var simulator: Simulator
-    private var latestSensorEvent by mutableStateOf<SensorEvent?>(null)
+
+    private var latestAccelerometerEvent by mutableStateOf<SensorEvent?>(null)
+    private var latestBarometerEvent by mutableStateOf<SensorEvent?>(null)
+    private var latestOrientationEvent by mutableStateOf<SensorEvent?>(null)
+
+    private var isSimulationRunning by mutableStateOf(false)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
         sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
-        val dataFlow = parse(this, "Accelerometer", "Accelerometer.csv")
-
-        // Create the simulator and pass this activity's SensorEventListener
-        simulator = Simulator(
-            sensorManager,
-            this,
-            Sensor.TYPE_ACCELEROMETER,
-            dataFlow,
-            resampleRate = 1000000
-        )
-
-        // Start the simulation with the CSV file
-        simulator.runSimulation()
+//        val dataFlow = parse(this, "Accelerometer", "Accelerometer.csv")
 
         setContent {
             AirsenseTheme {
@@ -52,23 +45,68 @@ class MainActivity : ComponentActivity(), SensorEventListener {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colors.background
                 ) {
-                    Greeting("Android")
-                    Test(this, "Accelerometer.csv")
-                    latestSensorEvent?.let { event ->
-                        DisplaySimulatedData(event)
+//                    Greeting("Android")
+//                    Test(this, "Accelerometer.csv")
+                    Column {
+                        // Display data for different sensors
+                        latestAccelerometerEvent?.let { DisplaySensorData("Accelerometer", it) }
+                        latestBarometerEvent?.let { DisplaySensorData("Barometer", it) }
+                        latestOrientationEvent?.let { DisplaySensorData("Orientation", it) }
+
+                        // Button to toggle simulation
+                        Button(onClick = {
+                            if (isSimulationRunning) {
+                                stopSimulation()
+                            } else {
+                                startSimulation()
+                            }
+                        }) {
+                            Text(if (isSimulationRunning) "Stop Simulation" else "Start Simulation")
+                        }
                     }
                 }
             }
         }
     }
 
-    override fun onSensorChanged(event: SensorEvent) {
-        latestSensorEvent = event
-        // This method will now receive simulated data
-        Log.d(
-            "SensorSimulator",
-            "Received simulated sensor data: ${event.values.contentToString()}"
+    private fun startSimulation() {
+        isSimulationRunning = true
+        val accelerometerData = parse(this, "Accelerometer", "Accelerometer.csv")
+        val barometerData = parse(this, "Barometer", "Barometer.csv")
+        val orientationData = parse(this, "Orientation", "Orientation.csv")
+
+        simulator = Simulator(
+            sensorManager,
+            this,
+            listOf(
+                Sensor.TYPE_ACCELEROMETER to accelerometerData,
+                Sensor.TYPE_PRESSURE to barometerData,
+                Sensor.TYPE_ORIENTATION to orientationData
+            ),
+            resampleRate = 1000000
         )
+        simulator.runSimulation()
+    }
+
+    // Stop the simulation
+    private fun stopSimulation() {
+        isSimulationRunning = false
+        simulator.stopSimulation()
+    }
+
+    override fun onSensorChanged(event: SensorEvent) {
+        if (!isSimulationRunning) {
+            when (event.sensor.type) {
+                Sensor.TYPE_ACCELEROMETER -> latestAccelerometerEvent = event
+                Sensor.TYPE_PRESSURE -> latestBarometerEvent = event
+                Sensor.TYPE_ORIENTATION -> latestOrientationEvent = event
+            }
+        }
+        // This method will now receive simulated data
+//        Log.d(
+//            "SensorSimulator",
+//            "Received simulated sensor data: ${event.values.contentToString()}"
+//        )
     }
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
@@ -103,25 +141,12 @@ fun DefaultPreview() {
 }
 
 @Composable
-fun SensorDataDisplay(sensorData: SensorData) {
+fun DisplaySensorData(sensorName: String, event: SensorEvent) {
     Column {
-        Text(text = "Simulated Sensor Data:")
-        Text(text = "X: ${sensorData.getX()}")
-        Text(text = "Y: ${sensorData.getY()}")
-        Text(text = "Z: ${sensorData.getZ()}")
+        Text(text = "$sensorName Data:")
+        Text(text = "X: ${event.values.getOrNull(0)}")
+        Text(text = "Y: ${event.values.getOrNull(1)}")
+        Text(text = "Z: ${event.values.getOrNull(2)}")
+        Text(text = "Timestamp: ${event.timestamp}")
     }
-}
-
-// Inside your MainActivity or wherever you're injecting the data
-@Composable
-fun DisplaySimulatedData(event: SensorEvent) {
-    val sensorData = SensorData(
-        "acc",
-        event.timestamp.toString(),
-        5.53.toFloat(),
-        event.values[0],
-        event.values[1],
-        event.values[2]
-    )
-    SensorDataDisplay(sensorData)
 }
