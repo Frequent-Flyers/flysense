@@ -35,8 +35,17 @@ class CustomSensorManager(
         samplingPeriodUs: Int,
         maxReportLatencyUs: Int
     ): Boolean {
-        //:TODO: Implement
-        return false
+        sensorMap[sensor.type] = sensor
+        if (eventCount[sensor.type] == null) eventCount[sensor.type] = 0
+        samplingPeriodNsMap[sensor.type] = samplingPeriodUs.toLong() * 1000
+
+        listeners[listener] = sensor.type
+        listenerByTypeMap[sensor.type] = listener
+        if (!running) {
+            Thread(this).start()
+            running = true
+        }
+        return true
     }
 
     override fun unregisterListener(listener: SensorEventListener) {
