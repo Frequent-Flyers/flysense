@@ -1,152 +1,119 @@
 package com.example.airsense
 
-import android.content.Context
-import android.hardware.Sensor
-import android.hardware.SensorEvent
-import android.hardware.SensorEventListener
-import android.hardware.SensorManager
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material.Button
-import androidx.compose.material.MaterialTheme
-import androidx.compose.material.Surface
 import androidx.compose.material.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.airsense.ui.theme.AirsenseTheme
+import dagger.hilt.android.AndroidEntryPoint
 
-class MainActivity : ComponentActivity(), SensorEventListener {
-    private lateinit var sensorManager: SensorManager
-    private lateinit var simulator: Simulator
-
-    private var latestAccelerometerEvent by mutableStateOf<SensorEvent?>(null)
-    private var latestBarometerEvent by mutableStateOf<SensorEvent?>(null)
-    private var latestOrientationEvent by mutableStateOf<SensorEvent?>(null)
-
-    private var isSimulationRunning by mutableStateOf(false)
-
+@AndroidEntryPoint
+class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-
-        sensorManager = getSystemService(SENSOR_SERVICE) as SensorManager
-//        val dataFlow = parse(this, "Accelerometer", "Accelerometer.csv")
-
         setContent {
             AirsenseTheme {
-                // A surface container using the 'background' color from the theme
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colors.background
-                ) {
-//                    Greeting("Android")
-//                    Test(this, "Accelerometer.csv")
-                    Column {
-                        // Display data for different sensors
-                        latestAccelerometerEvent?.let { DisplaySensorData("Accelerometer", it) }
-                        latestBarometerEvent?.let { DisplaySensorData("Barometer", it) }
-                        latestOrientationEvent?.let { DisplaySensorData("Orientation", it) }
+                val viewModel = viewModel<MainViewModel>()
+                val isDark = viewModel.isDark
+                val useFakeSensor = viewModel.useFakeSensor
 
-                        // Button to toggle simulation
-                        Button(onClick = {
-                            if (isSimulationRunning) {
-                                stopSimulation()
+                // Using a Column to arrange elements vertically
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(if (isDark) Color.DarkGray else Color.White),
+                    verticalArrangement = Arrangement.Center, // Centers the content vertically
+                    horizontalAlignment = Alignment.CenterHorizontally // Centers content horizontally
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp), // Add padding around the box
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = if (isDark) {
+                                "It's dark outside: ${viewModel.lightValue}"
                             } else {
-                                startSimulation()
-                            }
-                        }) {
-                            Text(if (isSimulationRunning) "Stop Simulation" else "Start Simulation")
+                                "It's bright outside: ${viewModel.lightValue}"
+                            },
+                            color = if (isDark) Color.White else Color.DarkGray
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp)) // Add vertical space of 16.dp
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "Absolute acceleration: ${viewModel.absoluteAcceleration}\n" +
+                                    "Current timestamp: ${viewModel.currentTimestamp}\n" +
+                                    "Time between points: ${viewModel.timeBetweenPoints}",
+                        )
+                    }
+
+                    //for orientation sensor
+                    Spacer(modifier = Modifier.height(16.dp)) // Add vertical space of 16.dp
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "Pitch: ${viewModel.pitch}\n" +
+                                    "Roll: ${viewModel.roll}\n" +
+                                    "Yaw: ${viewModel.yaw}",
+                        )
+                    }
+
+                    //for orientation sensor
+                    Spacer(modifier = Modifier.height(16.dp)) // Add vertical space of 16.dp
+
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = "Pressure: ${viewModel.pressure}\n",
+                        )
+                    }
+
+                    // Spacer
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    // Button to toggle between real and fake accelerometer data
+                    Button(
+                        onClick = {
+                            viewModel.toggleSensor()
                         }
+                    ) {
+                        Text(text = if (useFakeSensor) "Use Real Sensor" else "Use Simulated Sensor")
                     }
                 }
             }
         }
-    }
-
-    private fun startSimulation() {
-        isSimulationRunning = true
-        val accelerometerData = parse(this, "Accelerometer", "Accelerometer.csv")
-        val barometerData = parse(this, "Barometer", "Barometer.csv")
-        val orientationData = parse(this, "Orientation", "Orientation.csv")
-
-        simulator = Simulator(
-            sensorManager,
-            this,
-            listOf(
-                Sensor.TYPE_ACCELEROMETER to accelerometerData,
-                Sensor.TYPE_PRESSURE to barometerData,
-                Sensor.TYPE_ORIENTATION to orientationData
-            ),
-            resampleRate = 1000000
-        )
-        simulator.runSimulation()
-    }
-
-    // Stop the simulation
-    private fun stopSimulation() {
-        isSimulationRunning = false
-        simulator.stopSimulation()
-    }
-
-    override fun onSensorChanged(event: SensorEvent) {
-        if (!isSimulationRunning) {
-            when (event.sensor.type) {
-                Sensor.TYPE_ACCELEROMETER -> latestAccelerometerEvent = event
-                Sensor.TYPE_PRESSURE -> latestBarometerEvent = event
-                Sensor.TYPE_ORIENTATION -> latestOrientationEvent = event
-            }
-        }
-        // This method will now receive simulated data
-//        Log.d(
-//            "SensorSimulator",
-//            "Received simulated sensor data: ${event.values.contentToString()}"
-//        )
-    }
-
-    override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {
-        // Not needed for this simulation
-    }
-
-    override fun onDestroy() {
-        super.onDestroy()
-        // Stop simulation when activity is destroyed
-        simulator.stopSimulation()
-    }
-}
-
-@Composable
-fun Greeting(name: String) {
-//    Text(text = "Hello $name!")
-}
-
-@Composable
-fun Test(context: Context, fileName: String) {
-    val dataFlow = parse(context, "Accelerometer", fileName)
-    Text(text = "\n")
-    Text(text = dataFlow[1].getX().toString())
-}
-
-@Preview(showBackground = true)
-@Composable
-fun DefaultPreview() {
-    AirsenseTheme {
-        Greeting("Android")
-    }
-}
-
-@Composable
-fun DisplaySensorData(sensorName: String, event: SensorEvent) {
-    Column {
-        Text(text = "$sensorName Data:")
-        Text(text = "X: ${event.values.getOrNull(0)}")
-        Text(text = "Y: ${event.values.getOrNull(1)}")
-        Text(text = "Z: ${event.values.getOrNull(2)}")
-        Text(text = "Timestamp: ${event.timestamp}")
     }
 }
