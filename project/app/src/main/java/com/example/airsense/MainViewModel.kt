@@ -85,6 +85,9 @@ class MainViewModel @Inject constructor(
         currentOrientationSensor.stopListening()
         currentBarometerSensor.stopListening()
 
+        //clear the deques in the flight detection algorithm
+        flightDetectionAlgorithm.reset()
+
         // Toggle between real and fake sensors
         useFakeSensor = !useFakeSensor
         currentAccelerometerSensor = if (useFakeSensor) {
