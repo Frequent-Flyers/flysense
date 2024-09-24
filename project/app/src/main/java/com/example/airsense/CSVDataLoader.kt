@@ -1,6 +1,8 @@
 package com.example.airsense
 
 import android.renderscript.Element.DataType
+import android.util.Log
+import androidx.core.math.MathUtils
 import java.io.BufferedReader
 import java.io.InputStream
 import java.io.InputStreamReader
@@ -14,6 +16,7 @@ class CSVDataLoader(private val inputStream: InputStream, private val dataType: 
     fun loadData(): List<Pair<Long, DoubleArray>> {
         val result = mutableListOf<Pair<Long, DoubleArray>>()
         val reader = BufferedReader(InputStreamReader(inputStream))
+
         reader.useLines { lines ->
             lines.drop(1).forEach { line -> // Drop the header row
                 val values = line.split(",")
@@ -53,11 +56,15 @@ class CSVDataLoader(private val inputStream: InputStream, private val dataType: 
                                 timestamp,
                                 doubleArrayOf(pressure)
                             )
-                        ) // Add timestamp and pressure data
+                        )
                     }
                 }
             }
         }
+
+
+        Log.d("CSVDataLoader", "Loaded ${result.size} data points for $dataType.")
+
         return result
     }
 }

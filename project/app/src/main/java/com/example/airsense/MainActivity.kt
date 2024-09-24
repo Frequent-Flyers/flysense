@@ -29,34 +29,15 @@ class MainActivity : ComponentActivity() {
         setContent {
             AirsenseTheme {
                 val viewModel = viewModel<MainViewModel>()
-                val isDark = viewModel.isDark
                 val useFakeSensor = viewModel.useFakeSensor
 
                 // Using a Column to arrange elements vertically
                 Column(
                     modifier = Modifier
-                        .fillMaxSize()
-                        .background(if (isDark) Color.DarkGray else Color.White),
+                        .fillMaxSize(),
                     verticalArrangement = Arrangement.Center, // Centers the content vertically
                     horizontalAlignment = Alignment.CenterHorizontally // Centers content horizontally
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp), // Add padding around the box
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = if (isDark) {
-                                "It's dark outside: ${viewModel.lightValue}"
-                            } else {
-                                "It's bright outside: ${viewModel.lightValue}"
-                            },
-                            color = if (isDark) Color.White else Color.DarkGray
-                        )
-                    }
-
-                    Spacer(modifier = Modifier.height(16.dp)) // Add vertical space of 16.dp
 
                     Box(
                         modifier = Modifier

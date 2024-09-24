@@ -1,8 +1,7 @@
-package com.example.airsense
+package com.example.airsense.detector.sensors
 
-import android.app.Application
 import android.hardware.Sensor
-import android.hardware.SensorEventListener
+import com.example.airsense.CSVDataLoader
 import kotlinx.coroutines.*
 
 class SimulatedBarometerSensor(

@@ -4,6 +4,9 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
+import com.example.airsense.detector.algorithm.FlightDetectionAlgorithm
+import com.example.airsense.detector.algorithm.SensorType
+import com.example.airsense.detector.sensors.MeasurableSensor
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import javax.inject.Named
@@ -11,8 +14,6 @@ import kotlin.math.sqrt
 
 @HiltViewModel
 class MainViewModel @Inject constructor(
-    @Named("lightSensor") private val lightSensor: MeasurableSensor,
-
     @Named("realAccelerometerSensor") private val realAccelerometerSensor: MeasurableSensor,
     @Named("simulatedAccelerometerSensor") private val simulatedAccelerometerSensor: MeasurableSensor,
 
@@ -22,9 +23,6 @@ class MainViewModel @Inject constructor(
     @Named("realBarometerSensor") private val realBarometerSensor: MeasurableSensor,
     @Named("simulatedBarometerSensor") private val simulatedBarometerSensor: MeasurableSensor
 ) : ViewModel() {
-
-    var isDark by mutableStateOf(false)
-    var lightValue by mutableStateOf(0f)
 
     var absoluteAcceleration by mutableStateOf(0f)
     var useFakeSensor by mutableStateOf(false)
@@ -43,15 +41,9 @@ class MainViewModel @Inject constructor(
     private lateinit var currentOrientationSensor: MeasurableSensor
     private lateinit var currentBarometerSensor: MeasurableSensor
 
-    init {
-        // Light sensor logic
-        lightSensor.startListening()
-        lightSensor.setOnSensorValuesChangedListener { values ->
-            val lux = values[1]
-            lightValue = lux.toFloat()
-            isDark = lux < 60f
-        }
+    private val flightDetectionAlgorithm = FlightDetectionAlgorithm()
 
+    init {
         // Start with the real accelerometer sensor by default
         currentAccelerometerSensor = realAccelerometerSensor
         currentOrientationSensor = realOrientationSensor
@@ -75,6 +67,8 @@ class MainViewModel @Inject constructor(
             // Calculate acceleration
             val acceleration = sqrt(x * x + y * y + z * z.toDouble()).toFloat()
             absoluteAcceleration = acceleration
+
+            flightDetectionAlgorithm.onSensorData(SensorType.ACCELEROMETER, values)
 
             // Calculate the time between points
             lastTimestamp = currentTimestamp
@@ -149,6 +143,12 @@ class MainViewModel @Inject constructor(
                 pitch = z
             }
 
+            flightDetectionAlgorithm.onSensorData(SensorType.ORIENTATION, values)
+
+            // Temporary string formatting to limit the number of decimal places
+            yaw = String.format("%.2f", yaw).toFloat()
+            roll = String.format("%.2f", roll).toFloat()
+            pitch = String.format("%.2f", pitch).toFloat()
         }
     }
 
@@ -158,12 +158,13 @@ class MainViewModel @Inject constructor(
             // First value is the timestamp
             val timestamp = values[0].toLong()
             pressure = values[1].toFloat()
+
+            flightDetectionAlgorithm.onSensorData(SensorType.BAROMETER, values)
         }
     }
 
     override fun onCleared() {
         super.onCleared()
-        lightSensor.stopListening()
         currentAccelerometerSensor.stopListening()
         currentOrientationSensor.stopListening()
     }

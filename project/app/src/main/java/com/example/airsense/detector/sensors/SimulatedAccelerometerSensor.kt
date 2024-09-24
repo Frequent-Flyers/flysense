@@ -1,13 +1,12 @@
-package com.example.airsense
+package com.example.airsense.detector.sensors
 
-import android.app.Application
 import android.hardware.Sensor
-import android.hardware.SensorEventListener
+import com.example.airsense.CSVDataLoader
 import kotlinx.coroutines.*
 
-class SimulatedOrientationSensor(
+class SimulatedAccelerometerSensor(
     private val csvDataLoader: CSVDataLoader
-) : MeasurableSensor(Sensor.TYPE_ROTATION_VECTOR) {
+) : MeasurableSensor(Sensor.TYPE_ACCELEROMETER) {
 
     private val sensorData: List<Pair<Long, DoubleArray>> = csvDataLoader.loadData()
     private var sensorJob: Job? = null

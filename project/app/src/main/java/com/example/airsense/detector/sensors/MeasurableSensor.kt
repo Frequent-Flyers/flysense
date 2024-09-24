@@ -1,4 +1,4 @@
-package com.example.airsense
+package com.example.airsense.detector.sensors
 
 abstract class MeasurableSensor(
     protected val sensorType: Int

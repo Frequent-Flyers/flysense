@@ -1,6 +1,7 @@
-package com.example.airsense
+package com.example.airsense.detector.sensors
 
 import android.app.Application
+import com.example.airsense.CSVDataLoader
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -11,13 +12,6 @@ import javax.inject.Singleton
 @Module
 @InstallIn(SingletonComponent::class)
 object SensorModule {
-
-    @Provides
-    @Singleton
-    @Named("lightSensor")
-    fun provideLightSensor(app: Application): MeasurableSensor {
-        return LightSensor(app)
-    }
 
     // Provide the real accelerometer sensor
     @Provides

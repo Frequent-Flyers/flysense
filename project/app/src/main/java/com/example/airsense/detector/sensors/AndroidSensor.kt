@@ -1,11 +1,10 @@
-package com.example.airsense
+package com.example.airsense.detector.sensors
 
 import android.content.Context
 import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.hardware.SensorManager
-import android.os.SystemClock
 
 abstract class AndroidSensor(
     private val context: Context,
