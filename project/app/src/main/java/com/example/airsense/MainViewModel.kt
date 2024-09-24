@@ -1,6 +1,5 @@
 package com.example.airsense
 
-import android.hardware.SensorManager
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -22,7 +21,7 @@ class MainViewModel @Inject constructor(
 
     @Named("realBarometerSensor") private val realBarometerSensor: MeasurableSensor,
     @Named("simulatedBarometerSensor") private val simulatedBarometerSensor: MeasurableSensor
-): ViewModel() {
+) : ViewModel() {
 
     var isDark by mutableStateOf(false)
     var lightValue by mutableStateOf(0f)
@@ -90,6 +89,7 @@ class MainViewModel @Inject constructor(
         // Stop the current sensor
         currentAccelerometerSensor.stopListening()
         currentOrientationSensor.stopListening()
+        currentBarometerSensor.stopListening()
 
         // Toggle between real and fake sensors
         useFakeSensor = !useFakeSensor
@@ -133,11 +133,16 @@ class MainViewModel @Inject constructor(
                 var headingAcc = values[5].toFloat()
 
                 // Correct calculation of pitch, roll, and yaw from the quaternion values
-                roll = Math.asin((2 * (scalar * y - z * x)).toDouble()).toFloat() * (180 / Math.PI.toFloat())  // Rotation around X-axis
-                pitch = Math.atan2((2 * (scalar * x + y * z)).toDouble(),
+                roll = Math.asin((2 * (scalar * y - z * x)).toDouble())
+                    .toFloat() * (180 / Math.PI.toFloat())  // Rotation around X-axis
+                pitch = Math.atan2(
+                    (2 * (scalar * x + y * z)).toDouble(),
                     (1 - 2 * (x * x + y * y)).toDouble()
                 ).toFloat() * (180 / Math.PI.toFloat())  // Rotation around Y-axis
-                yaw = Math.atan2((2 * (scalar * z + x * y)).toDouble(), (1 - 2 * (y * y + z * z)).toDouble()).toFloat() * (180 / Math.PI.toFloat())  // Rotation around Z-axis
+                yaw = Math.atan2(
+                    (2 * (scalar * z + x * y)).toDouble(),
+                    (1 - 2 * (y * y + z * z)).toDouble()
+                ).toFloat() * (180 / Math.PI.toFloat())  // Rotation around Z-axis
             } else {
                 yaw = x
                 roll = y
