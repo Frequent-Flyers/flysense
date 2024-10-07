@@ -10,7 +10,11 @@ class AccelerometerSensor(
     context = context,
     sensorFeature = PackageManager.FEATURE_SENSOR_ACCELEROMETER,
     sensorType = Sensor.TYPE_LINEAR_ACCELERATION
-)
+) {
+    override fun loadData(it: List<Pair<Long, DoubleArray>>) {
+        throw UnsupportedOperationException("Real sensors do not support loading data.")
+    }
+}
 
 class OrientationSensor(
     context: Context
@@ -18,7 +22,11 @@ class OrientationSensor(
     context = context,
     sensorFeature = PackageManager.FEATURE_SENSOR_GYROSCOPE,
     sensorType = Sensor.TYPE_ROTATION_VECTOR
-)
+) {
+    override fun loadData(it: List<Pair<Long, DoubleArray>>) {
+        throw UnsupportedOperationException("Real sensors do not support loading data.")
+    }
+}
 
 class BarometerSensor(
     context: Context
@@ -26,4 +34,8 @@ class BarometerSensor(
     context = context,
     sensorFeature = PackageManager.FEATURE_SENSOR_BAROMETER,
     sensorType = Sensor.TYPE_PRESSURE
-)
+) {
+    override fun loadData(it: List<Pair<Long, DoubleArray>>) {
+        throw UnsupportedOperationException("Real sensors do not support loading data.")
+    }
+}

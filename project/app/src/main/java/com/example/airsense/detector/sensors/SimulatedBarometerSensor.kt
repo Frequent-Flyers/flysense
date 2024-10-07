@@ -8,7 +8,7 @@ class SimulatedBarometerSensor(
     private val csvDataLoader: CSVDataLoader
 ) : MeasurableSensor(Sensor.TYPE_PRESSURE) {
 
-    private val sensorData: List<Pair<Long, DoubleArray>> = csvDataLoader.loadData()
+    private var sensorData: List<Pair<Long, DoubleArray>> = csvDataLoader.loadData()
     private var sensorJob: Job? = null
 
     override val doesSensorExist: Boolean
@@ -27,5 +27,9 @@ class SimulatedBarometerSensor(
 
     override fun stopListening() {
         sensorJob?.cancel() // Stop the sensor job when the fake sensor is stopped
+    }
+
+    override fun loadData(it: List<Pair<Long, DoubleArray>>) {
+        this.sensorData = it
     }
 }

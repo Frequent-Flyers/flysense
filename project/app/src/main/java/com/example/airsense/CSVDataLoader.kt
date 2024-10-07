@@ -1,8 +1,6 @@
 package com.example.airsense
 
-import android.renderscript.Element.DataType
 import android.util.Log
-import androidx.core.math.MathUtils
 import java.io.BufferedReader
 import java.io.InputStream
 import java.io.InputStreamReader
@@ -10,7 +8,7 @@ import java.io.InputStreamReader
 class CSVDataLoader(private val inputStream: InputStream, private val dataType: DataType) {
 
     enum class DataType {
-        ACCELEROMETER, ORIENTATION, BAROMETER
+        ACCELEROMETER, ORIENTATION, BAROMETER, UNKNOWN
     }
 
     fun loadData(): List<Pair<Long, DoubleArray>> {
@@ -31,8 +29,14 @@ class CSVDataLoader(private val inputStream: InputStream, private val dataType: 
                         val z = values[2].toDouble()
                         //create list and add timestamp and x, y, z data
                         var list = listOf(timestamp, x, y, z)
-                        result.add(Pair(timestamp, doubleArrayOf(x, y, z))) // Add timestamp and x, y, z data
+                        result.add(
+                            Pair(
+                                timestamp,
+                                doubleArrayOf(x, y, z)
+                            )
+                        ) // Add timestamp and x, y, z data
                     }
+
                     DataType.ORIENTATION -> {
                         // Timestamp is in the first column
                         val timestamp = values[0].toLong()
@@ -42,8 +46,14 @@ class CSVDataLoader(private val inputStream: InputStream, private val dataType: 
                         val pitch = values[8].toDouble()
                         //create list and add timestamp and yaw, qx, qz, roll, qw, qy, pitch data
                         var list = listOf(timestamp, yaw, roll, pitch)
-                        result.add(Pair(timestamp, doubleArrayOf(yaw, roll, pitch))) // Add timestamp and yaw, qx, qz, roll, qw, qy, pitch data
+                        result.add(
+                            Pair(
+                                timestamp,
+                                doubleArrayOf(yaw, roll, pitch)
+                            )
+                        ) // Add timestamp and yaw, qx, qz, roll, qw, qy, pitch data
                     }
+
                     DataType.BAROMETER -> {
                         // Timestamp is in the first column
                         val timestamp = values[0].toLong()
@@ -58,13 +68,17 @@ class CSVDataLoader(private val inputStream: InputStream, private val dataType: 
                             )
                         )
                     }
+
+                    DataType.UNKNOWN -> {
+                        Log.e("CSVDataLoader", "Unknown data type.")
+                    }
                 }
             }
+
+
+            Log.d("CSVDataLoader", "Loaded ${result.size} data points for $dataType.")
+
+            return result
         }
-
-
-        Log.d("CSVDataLoader", "Loaded ${result.size} data points for $dataType.")
-
-        return result
     }
 }

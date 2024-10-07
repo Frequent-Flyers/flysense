@@ -14,4 +14,6 @@ abstract class MeasurableSensor(
     fun setOnSensorValuesChangedListener(listener: (List<Double>) -> Unit) {
         onSensorValuesChanged = listener
     }
+
+    abstract fun loadData(it: List<Pair<Long, DoubleArray>>)
 }

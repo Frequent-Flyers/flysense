@@ -42,7 +42,7 @@ class FlightDetectionAlgorithm {
             val accelerationChanges = analyzeDataChange(accelerometerDataQueue)
             val altitudeChanges = analyzeDataChange(barometerDataQueue)
             val orientationChanges = analyzeDataChange(orientationDataQueue)
-            println("Acceleration changes: $accelerationChanges")
+            // println("Acceleration changes: $accelerationChanges")
 
             // Implement flight detection logic here based on the changes
 //            if (accelerationChanges > threshold && altitudeChanges > threshold && orientationChanges < threshold) {

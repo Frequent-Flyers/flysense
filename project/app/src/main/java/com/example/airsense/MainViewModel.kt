@@ -7,6 +7,9 @@ import androidx.lifecycle.ViewModel
 import com.example.airsense.detector.algorithm.FlightDetectionAlgorithm
 import com.example.airsense.detector.algorithm.SensorType
 import com.example.airsense.detector.sensors.MeasurableSensor
+import com.example.airsense.detector.sensors.SimulatedAccelerometerSensor
+import com.example.airsense.detector.sensors.SimulatedBarometerSensor
+import com.example.airsense.detector.sensors.SimulatedOrientationSensor
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import javax.inject.Named
@@ -15,13 +18,13 @@ import kotlin.math.sqrt
 @HiltViewModel
 class MainViewModel @Inject constructor(
     @Named("realAccelerometerSensor") private val realAccelerometerSensor: MeasurableSensor,
-    @Named("simulatedAccelerometerSensor") private val simulatedAccelerometerSensor: MeasurableSensor,
+    @Named("simulatedAccelerometerSensor") private var simulatedAccelerometerSensor: MeasurableSensor,
 
     @Named("realOrientationSensor") private val realOrientationSensor: MeasurableSensor,
-    @Named("simulatedOrientationSensor") private val simulatedOrientationSensor: MeasurableSensor,
+    @Named("simulatedOrientationSensor") private var simulatedOrientationSensor: MeasurableSensor,
 
     @Named("realBarometerSensor") private val realBarometerSensor: MeasurableSensor,
-    @Named("simulatedBarometerSensor") private val simulatedBarometerSensor: MeasurableSensor
+    @Named("simulatedBarometerSensor") private var simulatedBarometerSensor: MeasurableSensor
 ) : ViewModel() {
 
     var absoluteAcceleration by mutableStateOf(0f)
@@ -171,4 +174,42 @@ class MainViewModel @Inject constructor(
         currentAccelerometerSensor.stopListening()
         currentOrientationSensor.stopListening()
     }
+
+    fun setSimulatedData(dataStreams: List<List<Pair<Long, DoubleArray>>>) {
+        if (dataStreams.isNotEmpty()) {
+            var accelerometerData: List<Pair<Long, DoubleArray>>? = null
+            var orientationData: List<Pair<Long, DoubleArray>>? = null
+            var barometerData: List<Pair<Long, DoubleArray>>? = null
+
+            for (dataStream in dataStreams) {
+                when {
+                    dataStream.isNotEmpty() && dataStream[0].second.size == 3 -> { // Assuming size 3 corresponds to accelerometer (x, y, z)
+                        accelerometerData = dataStream
+                    }
+                    dataStream.isNotEmpty() && dataStream[0].second.size == 3 -> { // Assuming size 3 corresponds to orientation (pitch, roll, yaw)
+                        orientationData = dataStream
+                    }
+                    dataStream.isNotEmpty() && dataStream[0].second.size == 1 -> { // Assuming size 1 corresponds to barometer (pressure)
+                        barometerData = dataStream
+                    }
+                }
+            }
+
+            accelerometerData?.let {
+                simulatedAccelerometerSensor.loadData(it) // Load accelerometer data
+                simulatedAccelerometerSensor.startListening() // Start the sensor
+            }
+
+            orientationData?.let {
+                simulatedOrientationSensor.loadData(it) // Load orientation data
+                simulatedOrientationSensor.startListening() // Start the sensor
+            }
+
+            barometerData?.let {
+                simulatedBarometerSensor.loadData(it) // Load barometer data
+                simulatedBarometerSensor.startListening() // Start the sensor
+            }
+        }
+    }
+
 }
