@@ -1,5 +1,6 @@
 package com.example.airsense
 
+import android.util.Log
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -11,6 +12,7 @@ import com.example.airsense.detector.sensors.SimulatedAccelerometerSensor
 import com.example.airsense.detector.sensors.SimulatedBarometerSensor
 import com.example.airsense.detector.sensors.SimulatedOrientationSensor
 import dagger.hilt.android.lifecycle.HiltViewModel
+import java.io.InputStream
 import javax.inject.Inject
 import javax.inject.Named
 import kotlin.math.sqrt
@@ -115,6 +117,7 @@ class MainViewModel @Inject constructor(
         startAccelerometerSensor()
         startOrientationSensor()
         startBarometerSensor()
+        Log.d("MainViewModel", "Using ${if (useFakeSensor) "fake" else "real"} sensor.")
     }
 
     private fun startOrientationSensor() {
@@ -175,41 +178,28 @@ class MainViewModel @Inject constructor(
         currentOrientationSensor.stopListening()
     }
 
-    fun setSimulatedData(dataStreams: List<List<Pair<Long, DoubleArray>>>) {
-        if (dataStreams.isNotEmpty()) {
-            var accelerometerData: List<Pair<Long, DoubleArray>>? = null
-            var orientationData: List<Pair<Long, DoubleArray>>? = null
-            var barometerData: List<Pair<Long, DoubleArray>>? = null
+    fun setSimulatedData(dataStreams: Map<CSVDataLoader.DataType, MutableList<List<Pair<Long, DoubleArray>>>>) {
+        dataStreams.forEach { mapEntry ->
+            val dataType = mapEntry.key
+            val data = mapEntry.value
 
-            for (dataStream in dataStreams) {
-                when {
-                    dataStream.isNotEmpty() && dataStream[0].second.size == 3 -> { // Assuming size 3 corresponds to accelerometer (x, y, z)
-                        accelerometerData = dataStream
-                    }
-                    dataStream.isNotEmpty() && dataStream[0].second.size == 3 -> { // Assuming size 3 corresponds to orientation (pitch, roll, yaw)
-                        orientationData = dataStream
-                    }
-                    dataStream.isNotEmpty() && dataStream[0].second.size == 1 -> { // Assuming size 1 corresponds to barometer (pressure)
-                        barometerData = dataStream
-                    }
+            when (dataType) {
+                CSVDataLoader.DataType.ACCELEROMETER -> {
+                    simulatedAccelerometerSensor.loadData(data.flatten())
                 }
-            }
 
-            accelerometerData?.let {
-                simulatedAccelerometerSensor.loadData(it) // Load accelerometer data
-                simulatedAccelerometerSensor.startListening() // Start the sensor
-            }
+                CSVDataLoader.DataType.ORIENTATION -> {
+                    simulatedOrientationSensor.loadData(data.flatten())
+                }
 
-            orientationData?.let {
-                simulatedOrientationSensor.loadData(it) // Load orientation data
-                simulatedOrientationSensor.startListening() // Start the sensor
-            }
+                CSVDataLoader.DataType.BAROMETER -> {
+                    simulatedBarometerSensor.loadData(data.flatten())
+                }
 
-            barometerData?.let {
-                simulatedBarometerSensor.loadData(it) // Load barometer data
-                simulatedBarometerSensor.startListening() // Start the sensor
+                CSVDataLoader.DataType.UNKNOWN -> {
+                    // Do nothing
+                }
             }
         }
     }
-
 }

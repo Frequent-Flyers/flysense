@@ -25,8 +25,9 @@ object SensorModule {
     @Provides
     @Singleton
     @Named("simulatedAccelerometerSensor")
-    fun provideSimulatedAccelerometerSensor(@Named("accelerometerCSVLoader") csvDataLoader: CSVDataLoader): MeasurableSensor {
-        return SimulatedAccelerometerSensor(csvDataLoader)
+    fun provideSimulatedAccelerometerSensor(): MeasurableSensor {
+        return SimulatedAccelerometerSensor(
+            CSVDataLoader(null, CSVDataLoader.DataType.ACCELEROMETER))
     }
 
     // Provide the orientation sensor
@@ -41,8 +42,8 @@ object SensorModule {
     @Provides
     @Singleton
     @Named("simulatedOrientationSensor")
-    fun provideSimulatedOrientationSensor(@Named("orientationCSVLoader") csvDataLoader: CSVDataLoader): MeasurableSensor {
-        return SimulatedOrientationSensor(csvDataLoader)
+    fun provideSimulatedOrientationSensor(): MeasurableSensor {
+        return SimulatedOrientationSensor(CSVDataLoader(null, CSVDataLoader.DataType.ORIENTATION))
     }
 
     // Provide the barometer sensor
@@ -57,8 +58,8 @@ object SensorModule {
     @Provides
     @Singleton
     @Named("simulatedBarometerSensor")
-    fun provideSimulatedBarometerSensor(@Named("barometerCSVLoader") csvDataLoader: CSVDataLoader): MeasurableSensor {
-        return SimulatedBarometerSensor(csvDataLoader)
+    fun provideSimulatedBarometerSensor(): MeasurableSensor {
+        return SimulatedBarometerSensor(CSVDataLoader(null, CSVDataLoader.DataType.BAROMETER))
     }
 
     // Provide the CSVDataLoader for the fake sensor

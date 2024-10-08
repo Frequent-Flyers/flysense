@@ -99,7 +99,7 @@ class MainActivity : ComponentActivity() {
                         Text(text = if (useFakeSensor) "Use Real Sensor" else "Use Simulated Sensor")
                     }
 
-                    EnterSimulator()
+                    EnterSimulator(viewModel)
                 }
             }
         }
@@ -107,7 +107,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-fun EnterSimulator() {
+fun EnterSimulator(viewModel: MainViewModel) {
     val context = LocalContext.current
 
     val launcher = rememberLauncherForActivityResult(

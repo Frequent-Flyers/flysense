@@ -11,6 +11,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.activity.viewModels
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -24,13 +25,13 @@ import dagger.hilt.android.AndroidEntryPoint
 import androidx.hilt.navigation.compose.hiltViewModel
 
 @AndroidEntryPoint
-class SimulatorActivity : ComponentActivity() {
+class SimulatorActivity() : ComponentActivity() {
+    private val mainViewModel: MainViewModel by viewModels()
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            val mainViewModel: MainViewModel = hiltViewModel()
-
             AirsenseTheme {
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     Column(
@@ -71,7 +72,11 @@ fun GreetingPreview() {
 fun MultiFilePicker(viewModel: MainViewModel) {
     val context = LocalContext.current
     val documentPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
-        val dataStreams = mutableListOf<List<Pair<Long, DoubleArray>>>()
+        val dataStreams = mapOf(
+            CSVDataLoader.DataType.ACCELEROMETER to mutableListOf<List<Pair<Long, DoubleArray>>>(),
+            CSVDataLoader.DataType.ORIENTATION to mutableListOf<List<Pair<Long, DoubleArray>>>(),
+            CSVDataLoader.DataType.BAROMETER to mutableListOf<List<Pair<Long, DoubleArray>>>()
+        )
 
         uris.forEach { uri ->
             context.contentResolver.openInputStream(uri)?.use { inputStream ->
@@ -93,7 +98,10 @@ fun MultiFilePicker(viewModel: MainViewModel) {
 
                 val csvDataLoader = CSVDataLoader(inputStream, dataType)
                 val data = csvDataLoader.loadData()
-                dataStreams.add(data)
+
+                if (data.isNotEmpty()) {
+                    dataStreams[dataType]?.add(data)
+                }
             }
         }
 

@@ -5,13 +5,18 @@ import java.io.BufferedReader
 import java.io.InputStream
 import java.io.InputStreamReader
 
-class CSVDataLoader(private val inputStream: InputStream, private val dataType: DataType) {
+class CSVDataLoader(private val inputStream: InputStream?, private val dataType: DataType) {
 
     enum class DataType {
         ACCELEROMETER, ORIENTATION, BAROMETER, UNKNOWN
     }
 
     fun loadData(): List<Pair<Long, DoubleArray>> {
+        if (inputStream == null) {
+            Log.e("CSVDataLoader", "Input stream is null.")
+            return emptyList()
+        }
+
         val result = mutableListOf<Pair<Long, DoubleArray>>()
         val reader = BufferedReader(InputStreamReader(inputStream))
 
@@ -74,7 +79,6 @@ class CSVDataLoader(private val inputStream: InputStream, private val dataType: 
                     }
                 }
             }
-
 
             Log.d("CSVDataLoader", "Loaded ${result.size} data points for $dataType.")
 
