@@ -2,7 +2,11 @@ package com.example.airsense.detector.sensors
 
 import android.hardware.Sensor
 import com.example.airsense.CSVDataLoader
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 class SimulatedAccelerometerSensor(
     private val csvDataLoader: CSVDataLoader
@@ -27,9 +31,11 @@ class SimulatedAccelerometerSensor(
 
     override fun stopListening() {
         sensorJob?.cancel() // Stop the sensor job when the fake sensor is stopped
+        sensorData = emptyList()
     }
 
     override fun loadData(it: List<Pair<Long, DoubleArray>>) {
         this.sensorData = it
+        startListening()
     }
 }

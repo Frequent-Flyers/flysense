@@ -6,7 +6,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,7 +19,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -34,7 +32,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             AirsenseTheme {
                 val viewModel = viewModel<MainViewModel>()
-                val useFakeSensor = viewModel.useFakeSensor
+//                val useFakeSensor = viewModel.useFakeSensor
 
                 // Using a Column to arrange elements vertically
                 Column(
@@ -96,7 +94,7 @@ class MainActivity : ComponentActivity() {
                             viewModel.toggleSensor()
                         }
                     ) {
-                        Text(text = if (useFakeSensor) "Use Real Sensor" else "Use Simulated Sensor")
+//                        Text(text = if (useFakeSensor) "Use Real Sensor" else "Use Simulated Sensor")
                     }
 
                     EnterSimulator(viewModel)

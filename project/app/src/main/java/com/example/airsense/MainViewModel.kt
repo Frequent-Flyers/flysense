@@ -1,18 +1,8 @@
 package com.example.airsense
 
-import android.util.Log
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import androidx.lifecycle.ViewModel
-import com.example.airsense.detector.algorithm.FlightDetectionAlgorithm
 import com.example.airsense.detector.algorithm.SensorType
 import com.example.airsense.detector.sensors.MeasurableSensor
-import com.example.airsense.detector.sensors.SimulatedAccelerometerSensor
-import com.example.airsense.detector.sensors.SimulatedBarometerSensor
-import com.example.airsense.detector.sensors.SimulatedOrientationSensor
 import dagger.hilt.android.lifecycle.HiltViewModel
-import java.io.InputStream
 import javax.inject.Inject
 import javax.inject.Named
 import kotlin.math.sqrt
@@ -20,33 +10,30 @@ import kotlin.math.sqrt
 @HiltViewModel
 class MainViewModel @Inject constructor(
     @Named("realAccelerometerSensor") private val realAccelerometerSensor: MeasurableSensor,
-    @Named("simulatedAccelerometerSensor") private var simulatedAccelerometerSensor: MeasurableSensor,
 
     @Named("realOrientationSensor") private val realOrientationSensor: MeasurableSensor,
-    @Named("simulatedOrientationSensor") private var simulatedOrientationSensor: MeasurableSensor,
 
-    @Named("realBarometerSensor") private val realBarometerSensor: MeasurableSensor,
-    @Named("simulatedBarometerSensor") private var simulatedBarometerSensor: MeasurableSensor
-) : ViewModel() {
+    @Named("realBarometerSensor") private val realBarometerSensor: MeasurableSensor
+) : BaseViewModel() {
 
-    var absoluteAcceleration by mutableStateOf(0f)
-    var useFakeSensor by mutableStateOf(false)
-
-    var currentTimestamp by mutableStateOf(0L)
-    var lastTimestamp by mutableStateOf(0L)
-    var timeBetweenPoints by mutableStateOf(0L)
-
-    var pitch by mutableStateOf(0f)
-    var roll by mutableStateOf(0f)
-    var yaw by mutableStateOf(0f)
-
-    var pressure by mutableStateOf(0f)
+//    var absoluteAcceleration by mutableStateOf(0f)
+//    var useFakeSensor by mutableStateOf(false)
+//
+//    var currentTimestamp by mutableStateOf(0L)
+//    var lastTimestamp by mutableStateOf(0L)
+//    var timeBetweenPoints by mutableStateOf(0L)
+//
+//    var pitch by mutableStateOf(0f)
+//    var roll by mutableStateOf(0f)
+//    var yaw by mutableStateOf(0f)
+//
+//    var pressure by mutableStateOf(0f)
 
     private lateinit var currentAccelerometerSensor: MeasurableSensor
     private lateinit var currentOrientationSensor: MeasurableSensor
     private lateinit var currentBarometerSensor: MeasurableSensor
 
-    private val flightDetectionAlgorithm = FlightDetectionAlgorithm()
+//    private val flightDetectionAlgorithm = FlightDetectionAlgorithm()
 
     init {
         // Start with the real accelerometer sensor by default
@@ -86,38 +73,38 @@ class MainViewModel @Inject constructor(
 
     fun toggleSensor() {
         // Stop the current sensor
-        currentAccelerometerSensor.stopListening()
-        currentOrientationSensor.stopListening()
-        currentBarometerSensor.stopListening()
-
-        //clear the deques in the flight detection algorithm
-        flightDetectionAlgorithm.reset()
-
-        // Toggle between real and fake sensors
-        useFakeSensor = !useFakeSensor
-        currentAccelerometerSensor = if (useFakeSensor) {
-            simulatedAccelerometerSensor
-        } else {
-            realAccelerometerSensor
-        }
-
-        currentOrientationSensor = if (useFakeSensor) {
-            simulatedOrientationSensor
-        } else {
-            realOrientationSensor
-        }
-
-        currentBarometerSensor = if (useFakeSensor) {
-            simulatedBarometerSensor
-        } else {
-            realBarometerSensor
-        }
-
-        // Start the new sensor
-        startAccelerometerSensor()
-        startOrientationSensor()
-        startBarometerSensor()
-        Log.d("MainViewModel", "Using ${if (useFakeSensor) "fake" else "real"} sensor.")
+//        currentAccelerometerSensor.stopListening()
+//        currentOrientationSensor.stopListening()
+//        currentBarometerSensor.stopListening()
+//
+//        //clear the deques in the flight detection algorithm
+//        flightDetectionAlgorithm.reset()
+//
+//        // Toggle between real and fake sensors
+//        useFakeSensor = !useFakeSensor
+//        currentAccelerometerSensor = if (useFakeSensor) {
+//            simulatedAccelerometerSensor
+//        } else {
+//            realAccelerometerSensor
+//        }
+//
+//        currentOrientationSensor = if (useFakeSensor) {
+//            simulatedOrientationSensor
+//        } else {
+//            realOrientationSensor
+//        }
+//
+//        currentBarometerSensor = if (useFakeSensor) {
+//            simulatedBarometerSensor
+//        } else {
+//            realBarometerSensor
+//        }
+//
+//        // Start the new sensor
+//        startAccelerometerSensor()
+//        startOrientationSensor()
+//        startBarometerSensor()
+//        Log.d("MainViewModel", "Using ${if (useFakeSensor) "fake" else "real"} sensor.")
     }
 
     private fun startOrientationSensor() {
@@ -176,30 +163,6 @@ class MainViewModel @Inject constructor(
         super.onCleared()
         currentAccelerometerSensor.stopListening()
         currentOrientationSensor.stopListening()
-    }
-
-    fun setSimulatedData(dataStreams: Map<CSVDataLoader.DataType, MutableList<List<Pair<Long, DoubleArray>>>>) {
-        dataStreams.forEach { mapEntry ->
-            val dataType = mapEntry.key
-            val data = mapEntry.value
-
-            when (dataType) {
-                CSVDataLoader.DataType.ACCELEROMETER -> {
-                    simulatedAccelerometerSensor.loadData(data.flatten())
-                }
-
-                CSVDataLoader.DataType.ORIENTATION -> {
-                    simulatedOrientationSensor.loadData(data.flatten())
-                }
-
-                CSVDataLoader.DataType.BAROMETER -> {
-                    simulatedBarometerSensor.loadData(data.flatten())
-                }
-
-                CSVDataLoader.DataType.UNKNOWN -> {
-                    // Do nothing
-                }
-            }
-        }
+        currentBarometerSensor.stopListening()
     }
 }

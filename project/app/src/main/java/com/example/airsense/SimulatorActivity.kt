@@ -12,27 +12,41 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import androidx.compose.foundation.layout.*
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material3.Button
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.airsense.ui.theme.AirsenseTheme
 import dagger.hilt.android.AndroidEntryPoint
-import androidx.hilt.navigation.compose.hiltViewModel
 
 @AndroidEntryPoint
 class SimulatorActivity() : ComponentActivity() {
-    private val mainViewModel: MainViewModel by viewModels()
+    private val simulationViewModel: SimulationViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
             AirsenseTheme {
+                val viewModel = viewModel<SimulationViewModel>()
                 Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
                     Column(
                         modifier = Modifier
@@ -42,10 +56,10 @@ class SimulatorActivity() : ComponentActivity() {
                     ) {
                         Greeting("Android")
                         Spacer(modifier = Modifier.height(16.dp))
-                        MultiFilePicker(mainViewModel)
+                        MultiFilePicker(viewModel)
                     }
 
-                    DisplaySensorValues(mainViewModel)
+                    DisplaySensorValues(viewModel)
                 }
             }
         }
@@ -69,44 +83,57 @@ fun GreetingPreview() {
 }
 
 @Composable
-fun MultiFilePicker(viewModel: MainViewModel) {
+fun MultiFilePicker(viewModel: SimulationViewModel) {
     val context = LocalContext.current
-    val documentPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
-        val dataStreams = mapOf(
-            CSVDataLoader.DataType.ACCELEROMETER to mutableListOf<List<Pair<Long, DoubleArray>>>(),
-            CSVDataLoader.DataType.ORIENTATION to mutableListOf<List<Pair<Long, DoubleArray>>>(),
-            CSVDataLoader.DataType.BAROMETER to mutableListOf<List<Pair<Long, DoubleArray>>>()
-        )
+    val documentPicker =
+        rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+            val dataStreams = mapOf(
+                CSVDataLoader.DataType.ACCELEROMETER to mutableListOf<List<Pair<Long, DoubleArray>>>(),
+                CSVDataLoader.DataType.ORIENTATION to mutableListOf<List<Pair<Long, DoubleArray>>>(),
+                CSVDataLoader.DataType.BAROMETER to mutableListOf<List<Pair<Long, DoubleArray>>>()
+            )
 
-        uris.forEach { uri ->
-            context.contentResolver.openInputStream(uri)?.use { inputStream ->
-                val name = getFileNameFromUri(context.contentResolver, uri)
-                var dataType: CSVDataLoader.DataType = CSVDataLoader.DataType.UNKNOWN
+            uris.forEach { uri ->
+                context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                    val name = getFileNameFromUri(context.contentResolver, uri)
+                    var dataType: CSVDataLoader.DataType = CSVDataLoader.DataType.UNKNOWN
 
-                Log.d("SimulatorActivity", "File name: $name")
+                    Log.d("SimulatorActivity", "File name: $name")
 
-                if (name != null) {
-                    dataType = when {
-                        name.contains("Accelerometer", ignoreCase = true) -> CSVDataLoader.DataType.ACCELEROMETER
-                        name.contains("Orientation", ignoreCase = true) -> CSVDataLoader.DataType.ORIENTATION
-                        name.contains("Barometer", ignoreCase = true) -> CSVDataLoader.DataType.BAROMETER
-                        else -> CSVDataLoader.DataType.UNKNOWN
+                    if (name != null) {
+                        dataType = when {
+                            name.contains(
+                                "Accelerometer",
+                                ignoreCase = true
+                            ) -> CSVDataLoader.DataType.ACCELEROMETER
+
+                            name.contains(
+                                "Orientation",
+                                ignoreCase = true
+                            ) -> CSVDataLoader.DataType.ORIENTATION
+
+                            name.contains(
+                                "Barometer",
+                                ignoreCase = true
+                            ) -> CSVDataLoader.DataType.BAROMETER
+
+                            else -> CSVDataLoader.DataType.UNKNOWN
+                        }
+                    }
+
+                    Log.d("SimulatorActivity", "Data type: $dataType")
+
+                    val csvDataLoader = CSVDataLoader(inputStream, dataType)
+                    val data = csvDataLoader.loadData()
+
+                    if (data.isNotEmpty()) {
+                        dataStreams[dataType]?.add(data)
                     }
                 }
-
-                Log.d("SimulatorActivity", "Data type: $dataType")
-
-                val csvDataLoader = CSVDataLoader(inputStream, dataType)
-                val data = csvDataLoader.loadData()
-
-                if (data.isNotEmpty()) {
-                    dataStreams[dataType]?.add(data)
-                }
             }
-        }
 
-        viewModel.setSimulatedData(dataStreams)
-    }
+            viewModel.setSimulatedData(dataStreams)
+        }
 
     // track if the picker should be launched
     var shouldLaunchPicker by remember { mutableStateOf(false) }
@@ -137,55 +164,51 @@ fun getFileNameFromUri(contentResolver: ContentResolver, uri: Uri): String? {
 
 
 @Composable
-fun DisplaySensorValues(viewModel: MainViewModel) {
+fun DisplaySensorValues(viewModel: SimulationViewModel) {
     Column(
         modifier = Modifier.fillMaxSize(),
         verticalArrangement = Arrangement.Center,
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        if (viewModel.absoluteAcceleration != 0f || viewModel.pitch != 0f || viewModel.roll != 0f || viewModel.yaw != 0f || viewModel.pressure != 0f) {
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "Absolute acceleration: ${viewModel.absoluteAcceleration}\n" +
-                            "Current timestamp: ${viewModel.currentTimestamp}\n" +
-                            "Time between points: ${viewModel.timeBetweenPoints}",
-                )
-            }
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "Absolute acceleration: ${viewModel.absoluteAcceleration}\n" +
+                        "Current timestamp: ${viewModel.currentTimestamp}\n" +
+                        "Time between points: ${viewModel.timeBetweenPoints}",
+            )
+        }
 
-            Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "Pitch: ${viewModel.pitch}\n" +
-                            "Roll: ${viewModel.roll}\n" +
-                            "Yaw: ${viewModel.yaw}",
-                )
-            }
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "Pitch: ${viewModel.pitch}\n" +
+                        "Roll: ${viewModel.roll}\n" +
+                        "Yaw: ${viewModel.yaw}",
+            )
+        }
 
-            Spacer(modifier = Modifier.height(16.dp))
+        Spacer(modifier = Modifier.height(16.dp))
 
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp),
-                contentAlignment = Alignment.Center
-            ) {
-                Text(
-                    text = "Pressure: ${viewModel.pressure}\n",
-                )
-            }
-        } else {
-            Text("No sensor data loaded. Please load CSV files.")
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            Text(
+                text = "Pressure: ${viewModel.pressure}\n",
+            )
         }
     }
 }
