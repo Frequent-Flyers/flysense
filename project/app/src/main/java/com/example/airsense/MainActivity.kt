@@ -2,6 +2,7 @@ package com.example.airsense
 
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -27,11 +28,14 @@ import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    private lateinit var viewModel: MainViewModel
+
     override fun onCreate(savedInstanceState: Bundle?) {
+        Log.d("MainActivity", "onCreate")
         super.onCreate(savedInstanceState)
         setContent {
             AirsenseTheme {
-                val viewModel = viewModel<MainViewModel>()
+                viewModel = viewModel<MainViewModel>()
 //                val useFakeSensor = viewModel.useFakeSensor
 
                 // Using a Column to arrange elements vertically
@@ -102,6 +106,16 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    override fun onResume() {
+        Log.d("MainActivity", "onResume")
+        super.onResume()
+        if (::viewModel.isInitialized) {
+            viewModel.startListening()
+        } else {
+            Log.e("MainActivity", "viewModel is not initialized yet")
+        }
+    }
 }
 
 @Composable
@@ -117,6 +131,8 @@ fun EnterSimulator(viewModel: MainViewModel) {
         Button(onClick = {
             val intent = Intent(context, SimulatorActivity::class.java)
             launcher.launch(intent)
+            //stop the real sensors listening
+            viewModel.stopListening()
         }) {
             Text(text = "Enter Simulator")
         }

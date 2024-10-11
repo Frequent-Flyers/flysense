@@ -165,4 +165,16 @@ class MainViewModel @Inject constructor(
         currentOrientationSensor.stopListening()
         currentBarometerSensor.stopListening()
     }
+
+    fun stopListening() {
+        currentAccelerometerSensor.stopListening()
+        currentOrientationSensor.stopListening()
+        currentBarometerSensor.stopListening()
+    }
+
+    fun startListening() {
+        currentAccelerometerSensor.startListening()
+        currentOrientationSensor.startListening()
+        currentBarometerSensor.startListening()
+    }
 }

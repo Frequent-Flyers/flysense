@@ -1,5 +1,7 @@
 package com.example.airsense.detector.algorithm
 
+import android.util.Log
+
 class FlightDetectionAlgorithm {
 
     // Hold the last N data points for each sensor
@@ -33,6 +35,7 @@ class FlightDetectionAlgorithm {
 
     private fun detectFlight() {
         // Only proceed if we have enough data points in all queues
+        Log.d("barometerDataQueue", barometerDataQueue.toString())
         if (accelerometerDataQueue.size == maxDataPoints &&
             barometerDataQueue.size == maxDataPoints &&
             orientationDataQueue.size == maxDataPoints
