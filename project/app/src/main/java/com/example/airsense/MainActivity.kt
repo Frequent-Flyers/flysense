@@ -54,7 +54,7 @@ class MainActivity : ComponentActivity() {
                     ) {
                         Text(
                             text = "Absolute acceleration: ${viewModel.absoluteAcceleration}\n" +
-                                    "Current timestamp: ${viewModel.currentTimestamp}\n" +
+                                    "Current timestamp: ${viewModel.accelCurrentTimestamp}\n" +
                                     "Time between points: ${viewModel.timeBetweenPoints}",
                         )
                     }

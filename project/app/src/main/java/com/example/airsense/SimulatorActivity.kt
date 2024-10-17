@@ -89,7 +89,7 @@ fun MultiFilePicker(viewModel: SimulationViewModel) {
         rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
             val dataStreams = mapOf(
                 CSVDataLoader.DataType.ACCELEROMETER to mutableListOf<List<Pair<Long, DoubleArray>>>(),
-                CSVDataLoader.DataType.ORIENTATION to mutableListOf<List<Pair<Long, DoubleArray>>>(),
+//                CSVDataLoader.DataType.ORIENTATION to mutableListOf<List<Pair<Long, DoubleArray>>>(),
                 CSVDataLoader.DataType.BAROMETER to mutableListOf<List<Pair<Long, DoubleArray>>>()
             )
 
@@ -107,10 +107,10 @@ fun MultiFilePicker(viewModel: SimulationViewModel) {
                                 ignoreCase = true
                             ) -> CSVDataLoader.DataType.ACCELEROMETER
 
-                            name.contains(
-                                "Orientation",
-                                ignoreCase = true
-                            ) -> CSVDataLoader.DataType.ORIENTATION
+//                            name.contains(
+//                                "Orientation",
+//                                ignoreCase = true
+//                            ) -> CSVDataLoader.DataType.ORIENTATION
 
                             name.contains(
                                 "Barometer",
@@ -178,8 +178,8 @@ fun DisplaySensorValues(viewModel: SimulationViewModel) {
         ) {
             Text(
                 text = "Absolute acceleration: ${viewModel.absoluteAcceleration}\n" +
-                        "Current timestamp: ${viewModel.currentTimestamp}\n" +
-                        "Time between points: ${viewModel.timeBetweenPoints}",
+                        "Time between points: ${viewModel.timeBetweenPoints}\n" +
+                        "Time elapsed ${(viewModel.accelCurrentTimestamp - viewModel.accelFirstTimestamp) / 1000000000}\n",
             )
         }
 
@@ -192,22 +192,8 @@ fun DisplaySensorValues(viewModel: SimulationViewModel) {
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = "Pitch: ${viewModel.pitch}\n" +
-                        "Roll: ${viewModel.roll}\n" +
-                        "Yaw: ${viewModel.yaw}",
-            )
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            contentAlignment = Alignment.Center
-        ) {
-            Text(
-                text = "Pressure: ${viewModel.pressure}\n",
+                text = "Pressure: ${viewModel.pressure}\n" +
+                        "Time elapsed ${(viewModel.baroCurrentTimestamp - viewModel.baroFirstTimestamp) / 1000000000}\n",
             )
         }
     }

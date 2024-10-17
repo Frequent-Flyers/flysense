@@ -1,6 +1,5 @@
 package com.example.airsense
 
-import android.util.Log
 import com.example.airsense.detector.algorithm.SensorType
 import com.example.airsense.detector.sensors.MeasurableSensor
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -12,21 +11,26 @@ import kotlin.math.sqrt
 class SimulationViewModel @Inject constructor(
     @Named("simulatedAccelerometerSensor") private var simulatedAccelerometerSensor: MeasurableSensor,
 
-    @Named("simulatedOrientationSensor") private var simulatedOrientationSensor: MeasurableSensor,
+//    @Named("simulatedOrientationSensor") private var simulatedOrientationSensor: MeasurableSensor,
 
     @Named("simulatedBarometerSensor") private var simulatedBarometerSensor: MeasurableSensor
 ) : BaseViewModel() {
+    var timeElapsed = 0L
+
     // Simulation-specific logic goes here
     init {
         // Start simulated sensors and use shared methods from BaseViewModel
         startSimulatedAccelerometerSensor()
-        startSimulatedOrientationSensor()
+//        startSimulatedOrientationSensor()
         startSimulatedBarometerSensor()
     }
 
     private fun startSimulatedAccelerometerSensor() {
         simulatedAccelerometerSensor.startListening()
         simulatedAccelerometerSensor.setOnSensorValuesChangedListener { values ->
+            if (accelFirstTimestamp == 0L) {
+                accelFirstTimestamp = values[0].toLong()
+            }
             val timestamp = values[0].toLong()
 
             // Remaining values are the x, y, z sensor readings
@@ -39,45 +43,49 @@ class SimulationViewModel @Inject constructor(
             absoluteAcceleration = acceleration
 
             flightDetectionAlgorithm.onSensorData(SensorType.ACCELEROMETER, values)
-            Log.d("her er x", x.toString())
+            //Log.d("her er x", x.toString())
             // Calculate the time between points
-            lastTimestamp = currentTimestamp
-            currentTimestamp = timestamp
+            lastTimestamp = accelCurrentTimestamp
+            accelCurrentTimestamp = timestamp
             if (lastTimestamp != 0L) {
-                timeBetweenPoints = currentTimestamp - lastTimestamp
+                timeBetweenPoints = accelCurrentTimestamp - lastTimestamp
             }
         }
     }
 
-    private fun startSimulatedOrientationSensor() {
-        simulatedOrientationSensor.startListening()
-        simulatedOrientationSensor.setOnSensorValuesChangedListener { values ->
-            val timestamp = values[0].toLong()
-
-            // Remaining values are the yaw, qx, qz, roll, qw, qy, pitch sensor readings
-            var x = values[1].toFloat()
-            var y = values[2].toFloat()
-            var z = values[3].toFloat()
-            yaw = x
-            roll = y
-            pitch = z
-            flightDetectionAlgorithm.onSensorData(SensorType.ORIENTATION, values)
-
-            // Temporary string formatting to limit the number of decimal places
-            yaw = String.format("%.2f", yaw).toFloat()
-            roll = String.format("%.2f", roll).toFloat()
-            pitch = String.format("%.2f", pitch).toFloat()
-        }
-    }
+//    private fun startSimulatedOrientationSensor() {
+//        simulatedOrientationSensor.startListening()
+//        simulatedOrientationSensor.setOnSensorValuesChangedListener { values ->
+//            val timestamp = values[0].toLong()
+//
+//            // Remaining values are the yaw, qx, qz, roll, qw, qy, pitch sensor readings
+//            var x = values[1].toFloat()
+//            var y = values[2].toFloat()
+//            var z = values[3].toFloat()
+//            yaw = x
+//            roll = y
+//            pitch = z
+//            flightDetectionAlgorithm.onSensorData(SensorType.ORIENTATION, values)
+//
+//            // Temporary string formatting to limit the number of decimal places
+//            yaw = String.format("%.2f", yaw).toFloat()
+//            roll = String.format("%.2f", roll).toFloat()
+//            pitch = String.format("%.2f", pitch).toFloat()
+//        }
+//    }
 
     private fun startSimulatedBarometerSensor() {
         simulatedBarometerSensor.startListening()
         simulatedBarometerSensor.setOnSensorValuesChangedListener { values ->
+            if (baroFirstTimestamp == 0L) {
+                baroFirstTimestamp = values[0].toLong()
+            }
             // First value is the timestamp
             val timestamp = values[0].toLong()
             pressure = values[1].toFloat()
 
             flightDetectionAlgorithm.onSensorData(SensorType.BAROMETER, values)
+            baroCurrentTimestamp = timestamp
         }
     }
 
@@ -103,9 +111,9 @@ class SimulationViewModel @Inject constructor(
                     simulatedAccelerometerSensor.loadData(data.flatten())
                 }
 
-                CSVDataLoader.DataType.ORIENTATION -> {
-                    simulatedOrientationSensor.loadData(data.flatten())
-                }
+//                CSVDataLoader.DataType.ORIENTATION -> {
+//                    simulatedOrientationSensor.loadData(data.flatten())
+//                }
 
                 CSVDataLoader.DataType.BAROMETER -> {
                     simulatedBarometerSensor.loadData(data.flatten())
@@ -123,7 +131,7 @@ class SimulationViewModel @Inject constructor(
         simulatedAccelerometerSensor.stopListening()
 
         // Stop the simulated orientation sensor
-        simulatedOrientationSensor.stopListening()
+//        simulatedOrientationSensor.stopListening()
 
         // Stop the simulated barometer sensor
         simulatedBarometerSensor.stopListening()

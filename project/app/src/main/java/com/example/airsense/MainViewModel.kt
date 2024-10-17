@@ -63,10 +63,10 @@ class MainViewModel @Inject constructor(
             flightDetectionAlgorithm.onSensorData(SensorType.ACCELEROMETER, values)
 
             // Calculate the time between points
-            lastTimestamp = currentTimestamp
-            currentTimestamp = timestamp
+            lastTimestamp = accelCurrentTimestamp
+            accelCurrentTimestamp = timestamp
             if (lastTimestamp != 0L) {
-                timeBetweenPoints = currentTimestamp - lastTimestamp
+                timeBetweenPoints = accelCurrentTimestamp - lastTimestamp
             }
         }
     }
