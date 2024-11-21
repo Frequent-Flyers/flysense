@@ -1,6 +1,7 @@
 package com.example.airsense.detector.sensors
 
 import android.hardware.Sensor
+import android.util.Log
 import com.example.airsense.CSVDataLoader
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -33,9 +34,9 @@ class SimulatedBarometerSensor(
                 onSensorValuesChanged?.invoke(listOf(timestamp.toDouble()) + data.toList())
                 delay((1000L * coefficient).roundToLong()) // Simulate the sensor delay (e.g., 1 second)
                 //delay using thread.wait() to simulate the sensor delay
-                
             }
         }
+        Log.d("SimulatedBarometerSensor", "Sensor data has been exhausted")
     }
 
     override fun stopListening() {
