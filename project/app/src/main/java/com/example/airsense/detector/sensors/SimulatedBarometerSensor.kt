@@ -33,6 +33,7 @@ class SimulatedBarometerSensor(
 //                delay((100L * coefficient).roundToLong()) // Simulate the sensor delay (e.g., 1 second)
                 //delay using thread.wait() to simulate the sensor delay
             }
+            Log.d("SimulatedBarometerSensor", "End time baro: " + System.currentTimeMillis())
         }
         Log.d("SimulatedBarometerSensor", "Sensor data has been exhausted")
     }

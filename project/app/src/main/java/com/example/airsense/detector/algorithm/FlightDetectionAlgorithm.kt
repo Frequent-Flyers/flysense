@@ -103,24 +103,18 @@ class FlightDetectionAlgorithm {
         var finalTime = 0.0
         var endTime = 0.0
 
-        //add first barometer data reading to list. if it has three records, remove the first one before adding the new one
-        if (latestPressures.size == 3) {
-            latestPressures.removeAt(0)
-        }
-        latestPressures.add(barometerData.last())
-
         // Convert nanoseconds to seconds for all timestamps
         val timestampsInSeconds = timestamps.map { it / 1_000_000_000.0 }
 
         if (flightState == FlightState.CLIMBING) {
             //first lets check if we are climbing
-            if (isCruising(latestPressures)) {
+            if (isCruising(barometerData)) {
                 Log.d("FlightDetectionAlgorithm", "Cruising detected")
                 return FlightState.CRUISING
             }
             return FlightState.CLIMBING
         } else if (flightState == FlightState.CRUISING) {
-            if (isDescending(latestPressures)) {
+            if (isDescending(barometerData)) {
                 Log.d("FlightDetectionAlgorithm", "Descending detected")
                 return FlightState.DESCENDING
             }
@@ -188,10 +182,10 @@ class FlightDetectionAlgorithm {
                                     "Potential acceleration peak start at $currentTime seconds, acceleration: $currentAcceleration"
                                 )
                             } else {
-                                Log.d(
-                                    "yoiyo",
-                                    "inside acceleration peak start at $currentTime seconds, acceleration: $currentAcceleration"
-                                )
+//                                Log.d(
+//                                    "yoiyo",
+//                                    "inside acceleration peak start at $currentTime seconds, acceleration: $currentAcceleration"
+//                                )
                                 // Check if peak lasts at least 5 seconds
 
                                 if (currentTime - peakStartTime >= 5) {
@@ -201,9 +195,9 @@ class FlightDetectionAlgorithm {
                                     finalTime = currentTime
 
                                     for (j in i until smoothedAcceleration.size) {
-                                        println("variance acceleration: ${varianceAcceleration[j]}")
+                                        //print max variance accel
                                         if (timestampsInSeconds[j] > varianceCheckEndTime) break
-                                        if (varianceAcceleration[j] > 6) {
+                                        if (varianceAcceleration[j] > 3.5) {
                                             highVarianceFound = true
                                             Log.d(
                                                 "TakeoffDetection",
@@ -212,8 +206,10 @@ class FlightDetectionAlgorithm {
                                             break
                                         }
                                     }
+                                    println("max variance accel: ${varianceAcceleration.max()}")
                                     if (!highVarianceFound) {
                                         Log.d("FlightDetectionAlgorithm", "Takeoff detected")
+                                        latestPressures.clear()
                                         return FlightState.CLIMBING // Takeoff detected
                                     } else {
                                         Log.d(
@@ -252,8 +248,8 @@ class FlightDetectionAlgorithm {
         }
     }
 
-    fun isCruising(list: List<Double>, tolerance: Double = 5.0): Boolean {
-        println("list: $list")
+    fun isCruising(list: List<Double>, tolerance: Double = 2.0): Boolean {
+//        println("list: $list")
         if (list.size < 2) return false // Not enough data to determine cruise
         val minPressure = list.minOrNull() ?: return false
         val maxPressure = list.maxOrNull() ?: return false
@@ -263,9 +259,9 @@ class FlightDetectionAlgorithm {
     }
 
     fun isDescending(list: List<Double>): Boolean {
-        println("descending list: $list")
+//        println("descending list: $list")
         for (i in 0 until list.size - 1) {
-            if (list[i + 1] - list[i] < 10) {
+            if (list[i + 1] - list[i] < 0) {
                 return false // Not rising by at least 10
             }
         }

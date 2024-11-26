@@ -52,7 +52,7 @@ class SimulationViewModel @Inject constructor(
             // Add accelerometer data to the queue
             accelerometerQueue.add(accelValues)
             // Check if both queues have sufficient data
-            if (!isProcessing && accelerometerQueue.size >= 15000 && barometerQueue.size >= 15000) {
+            if (!isProcessing && accelerometerQueue.size >= 7000 && barometerQueue.size >= 7000) {
                 isProcessing = true
                 processNextBatch(accelerometerQueue, barometerQueue)
                 isProcessing = false
@@ -84,15 +84,15 @@ class SimulationViewModel @Inject constructor(
         barometerQueue: ArrayDeque<List<Double>>
     ) {
         // Take the first 15k points from both queues
-        val accelerometerData = accelerometerQueue.take(15000)
-        val barometerData = barometerQueue.take(15000)
+        val accelerometerData = accelerometerQueue.take(7000)
+        val barometerData = barometerQueue.take(7000)
 
         // Send data to the flight detection algorithm
         processCombinedData(accelerometerData, barometerData)
 
         // Remove the oldest 10k points, leaving a carryover of 5k
-        trimQueue(accelerometerQueue, 5000)
-        trimQueue(barometerQueue, 5000)
+        trimQueue(accelerometerQueue, 4000)
+        trimQueue(barometerQueue, 4000)
     }
 
     // Function to process combined data
