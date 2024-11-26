@@ -6,9 +6,7 @@ import com.example.airsense.CSVDataLoader
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlin.math.roundToLong
 
 class SimulatedAccelerometerSensor(
     private val csvDataLoader: CSVDataLoader,
@@ -34,7 +32,7 @@ class SimulatedAccelerometerSensor(
             for ((timestamp, data) in sensorData) {
                 // Use the listener set in MeasurableSensor
                 onSensorValuesChanged?.invoke(listOf(timestamp.toDouble()) + data.toList())
-                delay((10L * coefficient).roundToLong())
+//                delay((10L * coefficient).roundToLong())
             }
             Log.d("SimulatedAccelerometerSensor", "End time accel: " + System.currentTimeMillis())
         }

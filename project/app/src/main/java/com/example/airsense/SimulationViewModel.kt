@@ -1,6 +1,6 @@
 package com.example.airsense
 
-import com.example.airsense.detector.algorithm.SensorType
+import android.util.Log
 import com.example.airsense.detector.sensors.MeasurableSensor
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -20,72 +20,93 @@ class SimulationViewModel @Inject constructor(
     // Simulation-specific logic goes here
     init {
         // Start simulated sensors and use shared methods from BaseViewModel
-        startSimulatedAccelerometerSensor()
-//        startSimulatedOrientationSensor()
-        startSimulatedBarometerSensor()
+        startSimulatedSensors()
     }
 
-    private fun startSimulatedAccelerometerSensor() {
+    private fun startSimulatedSensors() {
+        val accelerometerQueue = ArrayDeque<List<Double>>()
+        val barometerQueue = ArrayDeque<List<Double>>()
+
+        var isProcessing = false
+
         simulatedAccelerometerSensor.startListening()
-        simulatedAccelerometerSensor.setOnSensorValuesChangedListener { values ->
+        simulatedBarometerSensor.startListening()
+
+        simulatedAccelerometerSensor.setOnSensorValuesChangedListener { accelValues ->
             if (accelFirstTimestamp == 0L) {
-                accelFirstTimestamp = values[0].toLong()
+                accelFirstTimestamp = accelValues[0].toLong()
+                Log.d("SimulatedAccelerometerSensor", "First accel timestamp: $accelFirstTimestamp")
             }
-            val timestamp = values[0].toLong()
-
-            // Remaining values are the x, y, z sensor readings
-            val x = values[1]
-            val y = values[2]
-            val z = values[3]
-
-            // Calculate acceleration
+            // Calculate the acceleration
+            val timestamp = accelValues[0].toLong()
+            val x = accelValues[1]
+            val y = accelValues[2]
+            val z = accelValues[3]
             val acceleration = sqrt(x * x + y * y + z * z.toDouble()).toFloat()
             absoluteAcceleration = acceleration
-
-            flightDetectionAlgorithm.onSensorData(SensorType.ACCELEROMETER, values)
-            //Log.d("her er x", x.toString())
-            // Calculate the time between points
             lastTimestamp = accelCurrentTimestamp
             accelCurrentTimestamp = timestamp
             if (lastTimestamp != 0L) {
                 timeBetweenPoints = accelCurrentTimestamp - lastTimestamp
             }
+            // Add accelerometer data to the queue
+            accelerometerQueue.add(accelValues)
+            // Check if both queues have sufficient data
+            if (!isProcessing && accelerometerQueue.size >= 15000 && barometerQueue.size >= 15000) {
+                isProcessing = true
+                processNextBatch(accelerometerQueue, barometerQueue)
+                isProcessing = false
+            }
+
         }
-    }
-
-//    private fun startSimulatedOrientationSensor() {
-//        simulatedOrientationSensor.startListening()
-//        simulatedOrientationSensor.setOnSensorValuesChangedListener { values ->
-//            val timestamp = values[0].toLong()
-//
-//            // Remaining values are the yaw, qx, qz, roll, qw, qy, pitch sensor readings
-//            var x = values[1].toFloat()
-//            var y = values[2].toFloat()
-//            var z = values[3].toFloat()
-//            yaw = x
-//            roll = y
-//            pitch = z
-//            flightDetectionAlgorithm.onSensorData(SensorType.ORIENTATION, values)
-//
-//            // Temporary string formatting to limit the number of decimal places
-//            yaw = String.format("%.2f", yaw).toFloat()
-//            roll = String.format("%.2f", roll).toFloat()
-//            pitch = String.format("%.2f", pitch).toFloat()
-//        }
-//    }
-
-    private fun startSimulatedBarometerSensor() {
-        simulatedBarometerSensor.startListening()
-        simulatedBarometerSensor.setOnSensorValuesChangedListener { values ->
+        simulatedBarometerSensor.setOnSensorValuesChangedListener { baroValues ->
             if (baroFirstTimestamp == 0L) {
-                baroFirstTimestamp = values[0].toLong()
+                baroFirstTimestamp = baroValues[0].toLong()
+                Log.d("SimulatedBarometerSensor", "First baro timestamp: $baroFirstTimestamp")
             }
             // First value is the timestamp
-            val timestamp = values[0].toLong()
-            pressure = values[1].toFloat()
+            val timestamp = baroValues[0].toLong()
+            pressure = baroValues[1].toFloat()
 
-            flightDetectionAlgorithm.onSensorData(SensorType.BAROMETER, values)
             baroCurrentTimestamp = timestamp
+
+            while (barometerQueue.size > accelerometerQueue.size) {
+                Thread.sleep(1) // Simple throttle to ensure synchronization
+            }
+
+            barometerQueue.add(baroValues)
+        }
+
+    }
+
+    private fun processNextBatch(
+        accelerometerQueue: ArrayDeque<List<Double>>,
+        barometerQueue: ArrayDeque<List<Double>>
+    ) {
+        // Take the first 15k points from both queues
+        val accelerometerData = accelerometerQueue.take(15000)
+        val barometerData = barometerQueue.take(15000)
+
+        // Send data to the flight detection algorithm
+        processCombinedData(accelerometerData, barometerData)
+
+        // Remove the oldest 10k points, leaving a carryover of 5k
+        trimQueue(accelerometerQueue, 5000)
+        trimQueue(barometerQueue, 5000)
+    }
+
+    // Function to process combined data
+    private fun processCombinedData(
+        accelerometerData: List<List<Double>>,
+        barometerData: List<List<Double>>
+    ) {
+        flightDetectionAlgorithm.processData(accelerometerData, barometerData)
+    }
+
+    // Function to trim the queue to retain the latest 'retainSize' elements
+    private fun <T> trimQueue(queue: ArrayDeque<T>, retainSize: Int) {
+        while (queue.size > retainSize) {
+            queue.removeFirst()
         }
     }
 
@@ -105,6 +126,7 @@ class SimulationViewModel @Inject constructor(
         dataStreams.forEach { mapEntry ->
             val dataType = mapEntry.key
             val data = mapEntry.value
+            Log.d("SimulatorActivity", "Data size: ${data[0].size} for type: $dataType")
 
             when (dataType) {
                 CSVDataLoader.DataType.ACCELEROMETER -> {

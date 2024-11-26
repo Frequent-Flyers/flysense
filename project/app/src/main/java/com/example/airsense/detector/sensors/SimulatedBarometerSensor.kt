@@ -6,9 +6,7 @@ import com.example.airsense.CSVDataLoader
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlin.math.roundToLong
 
 class SimulatedBarometerSensor(
     private val csvDataLoader: CSVDataLoader,
@@ -32,7 +30,7 @@ class SimulatedBarometerSensor(
             for ((timestamp, data) in sensorData) {
                 // Use the listener set in MeasurableSensor
                 onSensorValuesChanged?.invoke(listOf(timestamp.toDouble()) + data.toList())
-                delay((1000L * coefficient).roundToLong()) // Simulate the sensor delay (e.g., 1 second)
+//                delay((100L * coefficient).roundToLong()) // Simulate the sensor delay (e.g., 1 second)
                 //delay using thread.wait() to simulate the sensor delay
             }
         }
@@ -46,6 +44,7 @@ class SimulatedBarometerSensor(
 
     override fun loadData(it: List<Pair<Long, DoubleArray>>) {
         this.sensorData = it
+        Log.d("SimulatedBarometerSensor", "Loaded data size: ${it.size}")
         startListening()
     }
 }

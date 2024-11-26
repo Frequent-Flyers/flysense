@@ -92,6 +92,7 @@ fun MultiFilePicker(viewModel: SimulationViewModel) {
 //                CSVDataLoader.DataType.ORIENTATION to mutableListOf<List<Pair<Long, DoubleArray>>>(),
                 CSVDataLoader.DataType.BAROMETER to mutableListOf<List<Pair<Long, DoubleArray>>>()
             )
+            var accelerometerTimestamps: List<Long> = emptyList()
 
             uris.forEach { uri ->
                 context.contentResolver.openInputStream(uri)?.use { inputStream ->
@@ -127,7 +128,28 @@ fun MultiFilePicker(viewModel: SimulationViewModel) {
                     val data = csvDataLoader.loadData()
 
                     if (data.isNotEmpty()) {
-                        dataStreams[dataType]?.add(data)
+                        when (dataType) {
+                            CSVDataLoader.DataType.ACCELEROMETER -> {
+                                dataStreams[dataType]?.add(data)
+                                // Save accelerometer timestamps for interpolation
+                                accelerometerTimestamps = data.map { it.first }
+                            }
+
+                            CSVDataLoader.DataType.BAROMETER -> {
+                                if (accelerometerTimestamps.isNotEmpty()) {
+                                    Log.d("SimulatorActivity", "Interpolating barometer data")
+                                    // Interpolate barometer data to match accelerometer timestamps
+                                    val interpolatedBarometerData =
+                                        interpolateBarometerData(data, accelerometerTimestamps)
+                                    dataStreams[dataType]?.add(interpolatedBarometerData)
+                                } else {
+                                    dataStreams[dataType]?.add(data)
+                                }
+                            }
+
+                            else -> { /* Do nothing for unknown types */
+                            }
+                        }
                     }
                 }
             }
@@ -196,6 +218,51 @@ fun DisplaySensorValues(viewModel: SimulationViewModel) {
                         "Time elapsed ${(viewModel.baroCurrentTimestamp - viewModel.baroFirstTimestamp) / 1000000000}\n",
             )
         }
+    }
+}
+
+private fun interpolateBarometerData(
+    barometerData: List<Pair<Long, DoubleArray>>, // Original barometer data
+    accelerometerTimestamps: List<Long>          // Accelerometer timestamps as reference
+): List<Pair<Long, DoubleArray>> {
+    if (barometerData.isEmpty() || accelerometerTimestamps.isEmpty()) return emptyList()
+
+    val originalTimestamps = barometerData.map { it.first }
+    val originalPressures = barometerData.map { it.second.first() }
+
+    val interpolatedData = accelerometerTimestamps.map { targetTime ->
+        val (lowerIndex, upperIndex) = findNearestIndices(barometerData, targetTime)
+        val lowerTime = originalTimestamps[lowerIndex]
+        val upperTime = originalTimestamps[upperIndex]
+        val lowerPressure = originalPressures[lowerIndex]
+        val upperPressure = originalPressures[upperIndex]
+
+        val interpolatedPressure = if (lowerTime == upperTime) {
+            lowerPressure
+        } else {
+            val ratio = (targetTime - lowerTime).toDouble() / (upperTime - lowerTime).toDouble()
+            lowerPressure + ratio * (upperPressure - lowerPressure)
+        }
+
+        Pair(targetTime, doubleArrayOf(interpolatedPressure))
+    }
+
+    return interpolatedData
+}
+
+private fun findNearestIndices(
+    data: List<Pair<Long, DoubleArray>>,
+    timestamp: Long
+): Pair<Int, Int> {
+    val index = data.binarySearch { it.first.compareTo(timestamp) }
+    return if (index >= 0) {
+        Pair(index, index)
+    } else {
+        val insertionPoint = -(index + 1)
+        Pair(
+            maxOf(0, insertionPoint - 1), // Lower bound
+            minOf(data.lastIndex, insertionPoint) // Upper bound
+        )
     }
 }
 
