@@ -25,8 +25,10 @@ object SensorModule {
     @Provides
     @Singleton
     @Named("simulatedAccelerometerSensor")
-    fun provideSimulatedAccelerometerSensor(@Named("accelerometerCSVLoader") csvDataLoader: CSVDataLoader): MeasurableSensor {
-        return SimulatedAccelerometerSensor(csvDataLoader)
+    fun provideSimulatedAccelerometerSensor(): MeasurableSensor {
+        return SimulatedAccelerometerSensor(
+            CSVDataLoader(null, CSVDataLoader.DataType.ACCELEROMETER), SPEED
+        )
     }
 
     // Provide the orientation sensor
@@ -38,12 +40,15 @@ object SensorModule {
     }
 
     // Provide the fake orientation sensor
-    @Provides
-    @Singleton
-    @Named("simulatedOrientationSensor")
-    fun provideSimulatedOrientationSensor(@Named("orientationCSVLoader") csvDataLoader: CSVDataLoader): MeasurableSensor {
-        return SimulatedOrientationSensor(csvDataLoader)
-    }
+//    @Provides
+//    @Singleton
+//    @Named("simulatedOrientationSensor")
+//    fun provideSimulatedOrientationSensor(): MeasurableSensor {
+//        return SimulatedOrientationSensor(
+//            CSVDataLoader(null, CSVDataLoader.DataType.ORIENTATION),
+//            SPEED
+//        )
+//    }
 
     // Provide the barometer sensor
     @Provides
@@ -57,8 +62,11 @@ object SensorModule {
     @Provides
     @Singleton
     @Named("simulatedBarometerSensor")
-    fun provideSimulatedBarometerSensor(@Named("barometerCSVLoader") csvDataLoader: CSVDataLoader): MeasurableSensor {
-        return SimulatedBarometerSensor(csvDataLoader)
+    fun provideSimulatedBarometerSensor(): MeasurableSensor {
+        return SimulatedBarometerSensor(
+            CSVDataLoader(null, CSVDataLoader.DataType.BAROMETER),
+            SPEED
+        )
     }
 
     // Provide the CSVDataLoader for the fake sensor
@@ -71,13 +79,13 @@ object SensorModule {
     }
 
     // Provide the CSVDataLoader for the orientation sensor
-    @Provides
-    @Singleton
-    @Named("orientationCSVLoader")
-    fun provideOrientationCSVDataLoader(application: Application): CSVDataLoader {
-        val inputStream = application.assets.open("Orientation.csv")
-        return CSVDataLoader(inputStream, CSVDataLoader.DataType.ORIENTATION)
-    }
+//    @Provides
+//    @Singleton
+//    @Named("orientationCSVLoader")
+//    fun provideOrientationCSVDataLoader(application: Application): CSVDataLoader {
+//        val inputStream = application.assets.open("Orientation.csv")
+//        return CSVDataLoader(inputStream, CSVDataLoader.DataType.ORIENTATION)
+//    }
 
     // Provide the CSVDataLoader for the barometer sensor
     @Provides
@@ -88,3 +96,5 @@ object SensorModule {
         return CSVDataLoader(inputStream, CSVDataLoader.DataType.BAROMETER)
     }
 }
+
+var SPEED = 100.0

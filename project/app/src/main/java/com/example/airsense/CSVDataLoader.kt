@@ -5,13 +5,18 @@ import java.io.BufferedReader
 import java.io.InputStream
 import java.io.InputStreamReader
 
-class CSVDataLoader(private val inputStream: InputStream, private val dataType: DataType) {
+class CSVDataLoader(private val inputStream: InputStream?, private val dataType: DataType) {
 
     enum class DataType {
-        ACCELEROMETER, ORIENTATION, BAROMETER, UNKNOWN
+        ACCELEROMETER, BAROMETER, UNKNOWN
     }
 
     fun loadData(): List<Pair<Long, DoubleArray>> {
+        if (inputStream == null) {
+            Log.e("CSVDataLoader", "Input stream is null.")
+            return emptyList()
+        }
+
         val result = mutableListOf<Pair<Long, DoubleArray>>()
         val reader = BufferedReader(InputStreamReader(inputStream))
 
@@ -37,22 +42,22 @@ class CSVDataLoader(private val inputStream: InputStream, private val dataType: 
                         ) // Add timestamp and x, y, z data
                     }
 
-                    DataType.ORIENTATION -> {
-                        // Timestamp is in the first column
-                        val timestamp = values[0].toLong()
-                        // yaw, qx, qz, roll, qw, qy, pitch values are in the 3rd to 8th columns
-                        val yaw = values[2].toDouble()
-                        val roll = values[5].toDouble()
-                        val pitch = values[8].toDouble()
-                        //create list and add timestamp and yaw, qx, qz, roll, qw, qy, pitch data
-                        var list = listOf(timestamp, yaw, roll, pitch)
-                        result.add(
-                            Pair(
-                                timestamp,
-                                doubleArrayOf(yaw, roll, pitch)
-                            )
-                        ) // Add timestamp and yaw, qx, qz, roll, qw, qy, pitch data
-                    }
+//                    DataType.ORIENTATION -> {
+//                        // Timestamp is in the first column
+//                        val timestamp = values[0].toLong()
+//                        // yaw, qx, qz, roll, qw, qy, pitch values are in the 3rd to 8th columns
+//                        val yaw = values[2].toDouble()
+//                        val roll = values[5].toDouble()
+//                        val pitch = values[8].toDouble()
+//                        //create list and add timestamp and yaw, qx, qz, roll, qw, qy, pitch data
+//                        var list = listOf(timestamp, yaw, roll, pitch)
+//                        result.add(
+//                            Pair(
+//                                timestamp,
+//                                doubleArrayOf(yaw, roll, pitch)
+//                            )
+//                        ) // Add timestamp and yaw, qx, qz, roll, qw, qy, pitch data
+//                    }
 
                     DataType.BAROMETER -> {
                         // Timestamp is in the first column
@@ -74,7 +79,6 @@ class CSVDataLoader(private val inputStream: InputStream, private val dataType: 
                     }
                 }
             }
-
 
             Log.d("CSVDataLoader", "Loaded ${result.size} data points for $dataType.")
 

@@ -1,6 +1,6 @@
 plugins {
     id 'com.android.application'
-    id 'org.jetbrains.kotlin.android' version '1.9.0'
+    id 'org.jetbrains.kotlin.android' version '1.9.21'
     id 'com.google.relay' version '0.3.12'
     id 'kotlin-kapt'
     id 'dagger.hilt.android.plugin'

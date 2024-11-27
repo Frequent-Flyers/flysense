@@ -1,66 +1,279 @@
 package com.example.airsense.detector.algorithm
 
-class FlightDetectionAlgorithm {
+import android.util.Log
 
-    // Hold the last N data points for each sensor
-    private val maxDataPoints = 100
-    private val accelerometerDataQueue: ArrayDeque<List<Double>> = ArrayDeque(maxDataPoints)
-    private val barometerDataQueue: ArrayDeque<List<Double>> = ArrayDeque(maxDataPoints)
-    private val orientationDataQueue: ArrayDeque<List<Double>> = ArrayDeque(maxDataPoints)
+class FlightDetectionAlgorithm {
+    private var lastFlightState = FlightState.GROUNDED
+    private var flightStartTime = 0.0
+    private var counter = 0
+    private var flightState = FlightState.GROUNDED
+    var firstTimeStamp = 0.0
+    private var latestPressures = mutableListOf<Double>()
 
     fun reset() {
-        accelerometerDataQueue.clear()
-        barometerDataQueue.clear()
-        orientationDataQueue.clear()
     }
 
-    fun onSensorData(sensorType: SensorType, data: List<Double>) {
-        when (sensorType) {
-            SensorType.ACCELEROMETER -> addDataToQueue(accelerometerDataQueue, data)
-            SensorType.BAROMETER -> addDataToQueue(barometerDataQueue, data)
-            SensorType.ORIENTATION -> addDataToQueue(orientationDataQueue, data)
-        }
-        detectFlight()
-    }
-
-    // Helper function to add data to the queue and maintain the fixed size
-    private fun addDataToQueue(queue: ArrayDeque<List<Double>>, data: List<Double>) {
-        if (queue.size >= maxDataPoints) {
-            queue.removeFirst()  // Remove the oldest data point
-        }
-        queue.addLast(data)  // Add the newest data point
-    }
-
-    private fun detectFlight() {
-        // Only proceed if we have enough data points in all queues
-        if (accelerometerDataQueue.size == maxDataPoints &&
-            barometerDataQueue.size == maxDataPoints &&
-            orientationDataQueue.size == maxDataPoints
-        ) {
-
-            // Analyze the data change over time
-            val accelerationChanges = analyzeDataChange(accelerometerDataQueue)
-            val altitudeChanges = analyzeDataChange(barometerDataQueue)
-            val orientationChanges = analyzeDataChange(orientationDataQueue)
-            // println("Acceleration changes: $accelerationChanges")
-
-            // Implement flight detection logic here based on the changes
-//            if (accelerationChanges > threshold && altitudeChanges > threshold && orientationChanges < threshold) {
-//                println("Flight detected!")
+    fun onSensorData(
+        sensorType: SensorType,
+        sensorData: List<Double>
+    ) {
+//        when (sensorType) {
+//            SensorType.ACCELEROMETER -> {
+//                processData(sensorData, emptyList())
 //            }
+//            SensorType.BAROMETER -> {
+//                processData(emptyList(), sensorData)
+//            }
+//            else -> {
+//                Log.e("FlightDetectionAlgorithm", "Unsupported sensor type")
+//            }
+//        }
+    }
 
+    fun processData(accelerometerData: List<List<Double>>, barometerData: List<List<Double>>) {
+        if (accelerometerData.isEmpty() || barometerData.isEmpty()) {
+            Log.e("FlightDetectionAlgorithm", "Received empty sensor data for processing")
+            return
+        }
+        if (firstTimeStamp == 0.0) {
+            firstTimeStamp = accelerometerData.first()[0]
+        }
+
+        detectFlight(accelerometerData, barometerData)
+    }
+
+    private fun trimQueueToCarryover(queue: ArrayDeque<List<Double>>, carryOver: Int) {
+        while (queue.size > carryOver) queue.removeFirst()
+    }
+
+    private fun detectFlight(
+        accelerometerData: List<List<Double>>,
+        barometerData: List<List<Double>>
+    ) {
+        val timestamps = accelerometerData.map { it[0] }
+        val absoluteAcceleration = accelerometerData.map {
+            val (_, x, y, z) = it
+            Math.sqrt(x * x + y * y + z * z)
+        }
+
+        val smoothedAcceleration =
+            movingAverage(absoluteAcceleration, 997) //make it dynamic based on the data
+        val varianceAcceleration = variance(absoluteAcceleration, 997)
+
+        // Interpolate barometer data to match accelerometer timestamps
+        //val interpolatedBarometerData = interpolateBarometerData(barometerData.toList(), timestamps)
+        val interpolatedBarometerData = barometerData.map { it[1] }
+
+        flightState = detectTakeoffState(
+            timestamps,
+            smoothedAcceleration,
+            varianceAcceleration,
+            interpolatedBarometerData
+        )
+
+        if (flightState != lastFlightState) {
+            if (flightState == FlightState.CLIMBING) {
+                //we have started flying
+                flightStartTime = timestamps.last()
+                Log.d("FlightDetectionAlgorithm", "Flight detected, started at $flightStartTime")
+            } else if (flightState == FlightState.GROUNDED) {
+                val flightDuration = timestamps.last() - flightStartTime
+                Log.d("FlightDetectionAlgorithm", "Flight ended. Duration: $flightDuration seconds")
+            }
+            lastFlightState = flightState
         }
     }
 
-    // Example method to analyze changes in data over time
-    private fun analyzeDataChange(queue: ArrayDeque<List<Double>>): Double {
-        // Example: Calculate the difference between the first and last data point
-        val first = queue.first()[0]
-        val last = queue.last()[0]
-        return last - first  // Simple change over time, can be more complex
+    private fun detectTakeoffState(
+        timestamps: List<Double>,
+        smoothedAcceleration: List<Double>,
+        varianceAcceleration: List<Double>,
+        barometerData: List<Double>
+    ): FlightState {
+        counter++
+        //Log.d("FlightDetectionAlgorithm", "Counter: $counter")
+        val takeoffAccelerationThreshold = 0.45..0.8
+        val takeoffDuration = 25.0 // seconds
+        var takeoffStartTime = 0.0
+        var inTakeoff = false
+        var currentMaxVariance = 0.0
+        var validTakeoffSpotFound = false
+        var peakStartTime = 0.0
+        var highVarianceFound = false
+        var finalTime = 0.0
+        var endTime = 0.0
+
+        // Convert nanoseconds to seconds for all timestamps
+        val timestampsInSeconds = timestamps.map { it / 1_000_000_000.0 }
+
+        if (flightState == FlightState.CLIMBING) {
+            //first lets check if we are climbing
+            if (isCruising(barometerData)) {
+                Log.d("FlightDetectionAlgorithm", "Cruising detected")
+                return FlightState.CRUISING
+            }
+            return FlightState.CLIMBING
+        } else if (flightState == FlightState.CRUISING) {
+            if (isDescending(barometerData)) {
+                Log.d("FlightDetectionAlgorithm", "Descending detected")
+                return FlightState.DESCENDING
+            }
+            return FlightState.CRUISING
+        } else if (flightState == FlightState.DESCENDING) {
+            //we are approaching the ground
+            for (i in smoothedAcceleration.indices) {
+                val currentAcceleration = smoothedAcceleration[i]
+                if (currentAcceleration > 4.0) {
+                    Log.d("FlightDetectionAlgorithm", "Possible landing")
+                    println("time of possible landing: ${timestampsInSeconds[i]}")
+                    return FlightState.GROUNDED
+                }
+            }
+            return FlightState.DESCENDING
+        } else {
+            for (i in smoothedAcceleration.indices) {
+                var currentAcceleration = smoothedAcceleration[i]
+                var currentTime = timestampsInSeconds[i] // Now in seconds
+                if (!validTakeoffSpotFound) {
+                    if (currentAcceleration in takeoffAccelerationThreshold) {
+                        if (!inTakeoff) {
+                            inTakeoff = true
+                            takeoffStartTime = currentTime
+                            currentMaxVariance = 0.0
+                        }
+
+                        if (varianceAcceleration[i] > currentMaxVariance) {
+                            currentMaxVariance = varianceAcceleration[i]
+                        }
+
+                        if ((currentTime - takeoffStartTime) >= takeoffDuration) {
+                            inTakeoff = false
+                            endTime = currentTime
+                            if (currentMaxVariance < 1.0) {
+                                validTakeoffSpotFound = true
+                                Log.d(
+                                    "TakeoffDetection",
+                                    "Valid takeoff spot found. Time: $takeoffStartTime , Max Variance: $currentMaxVariance"
+                                )
+                                currentMaxVariance = 0.0
+                            }
+                        }
+                    } else {
+                        inTakeoff = false
+                        currentMaxVariance = 0.0
+                    }
+                } else {
+//                Log.d("TakeoffDetection", "Checking for acceleration peak after takeoff spot")
+                    // Check for acceleration peak within 30 seconds after takeoff spot
+                    val peakEndTime = takeoffStartTime + 30.0 // seconds
+
+                    currentTime = timestampsInSeconds[i] // Now in seconds
+//                if (currentTime > peakEndTime) {
+//                    break
+//                }
+//                    println("current time - endtime: ${currentTime - endTime}")
+
+                    if (currentTime - endTime <= 30) {
+                        currentAcceleration = smoothedAcceleration[i]
+                        if (currentAcceleration in 1.5..2.5) {
+                            if (peakStartTime == 0.0) {
+                                peakStartTime = currentTime
+                                Log.d(
+                                    "TakeoffDetection",
+                                    "Potential acceleration peak start at $currentTime seconds, acceleration: $currentAcceleration"
+                                )
+                            } else {
+//                                Log.d(
+//                                    "yoiyo",
+//                                    "inside acceleration peak start at $currentTime seconds, acceleration: $currentAcceleration"
+//                                )
+                                // Check if peak lasts at least 5 seconds
+
+                                if (currentTime - peakStartTime >= 5) {
+                                    println("tjena grabben")
+                                    // Now, perform the variance check for the next 30 seconds
+                                    val varianceCheckEndTime = currentTime + 30.0
+                                    finalTime = currentTime
+
+                                    for (j in i until smoothedAcceleration.size) {
+                                        //print max variance accel
+                                        if (timestampsInSeconds[j] > varianceCheckEndTime) break
+                                        if (varianceAcceleration[j] > 3.5) {
+                                            highVarianceFound = true
+                                            Log.d(
+                                                "TakeoffDetection",
+                                                "High variance found at ${timestampsInSeconds[j]} seconds, variance: ${varianceAcceleration[j]}"
+                                            )
+                                            break
+                                        }
+                                    }
+                                    println("max variance accel: ${varianceAcceleration.max()}")
+                                    if (!highVarianceFound) {
+                                        Log.d("FlightDetectionAlgorithm", "Takeoff detected")
+                                        latestPressures.clear()
+                                        return FlightState.CLIMBING // Takeoff detected
+                                    } else {
+                                        Log.d(
+                                            "TakeoffDetection",
+                                            "Takeoff not confirmed due to high variance after acceleration peak."
+                                        )
+                                    }
+                                    validTakeoffSpotFound = false
+                                    peakStartTime = 0.0
+
+                                }
+                            }
+                        } else {
+                            peakStartTime = 0.0
+                        }
+                    } else {
+                        validTakeoffSpotFound = false
+                        peakStartTime = 0.0
+                    }
+                }
+            }
+
+            return FlightState.GROUNDED
+        }
+        return FlightState.CLIMBING
+    }
+
+    private fun movingAverage(data: List<Double>, windowSize: Int): List<Double> {
+        return data.windowed(windowSize, 1, true) { it.average() }
+    }
+
+    private fun variance(data: List<Double>, windowSize: Int): List<Double> {
+        return data.windowed(windowSize, 1, true) { window ->
+            val mean = window.average()
+            window.map { (it - mean) * (it - mean) }.average()
+        }
+    }
+
+    fun isCruising(list: List<Double>, tolerance: Double = 2.0): Boolean {
+//        println("list: $list")
+        if (list.size < 2) return false // Not enough data to determine cruise
+        val minPressure = list.minOrNull() ?: return false
+        val maxPressure = list.maxOrNull() ?: return false
+        // Check if the difference between the min and max pressure is within the tolerance, and convert to positive number always
+        val diff = Math.abs(maxPressure - minPressure)
+        return diff <= tolerance
+    }
+
+    fun isDescending(list: List<Double>): Boolean {
+//        println("descending list: $list")
+        for (i in 0 until list.size - 1) {
+            if (list[i + 1] - list[i] < 0) {
+                return false // Not rising by at least 10
+            }
+        }
+        return true // All elements meet the descending condition
     }
 }
 
 enum class SensorType {
     ACCELEROMETER, BAROMETER, ORIENTATION
+}
+
+enum class FlightState {
+    GROUNDED, CRUISING, CLIMBING, DESCENDING
 }

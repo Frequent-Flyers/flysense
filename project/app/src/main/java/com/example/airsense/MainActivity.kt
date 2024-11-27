@@ -2,11 +2,11 @@ package com.example.airsense
 
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -20,7 +20,6 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -29,12 +28,15 @@ import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
+    private lateinit var viewModel: MainViewModel
+
     override fun onCreate(savedInstanceState: Bundle?) {
+        Log.d("MainActivity", "onCreate")
         super.onCreate(savedInstanceState)
         setContent {
             AirsenseTheme {
-                val viewModel = viewModel<MainViewModel>()
-                val useFakeSensor = viewModel.useFakeSensor
+                viewModel = viewModel<MainViewModel>()
+//                val useFakeSensor = viewModel.useFakeSensor
 
                 // Using a Column to arrange elements vertically
                 Column(
@@ -52,7 +54,7 @@ class MainActivity : ComponentActivity() {
                     ) {
                         Text(
                             text = "Absolute acceleration: ${viewModel.absoluteAcceleration}\n" +
-                                    "Current timestamp: ${viewModel.currentTimestamp}\n" +
+                                    "Current timestamp: ${viewModel.accelCurrentTimestamp}\n" +
                                     "Time between points: ${viewModel.timeBetweenPoints}",
                         )
                     }
@@ -96,18 +98,28 @@ class MainActivity : ComponentActivity() {
                             viewModel.toggleSensor()
                         }
                     ) {
-                        Text(text = if (useFakeSensor) "Use Real Sensor" else "Use Simulated Sensor")
+//                        Text(text = if (useFakeSensor) "Use Real Sensor" else "Use Simulated Sensor")
                     }
 
-                    EnterSimulator()
+                    EnterSimulator(viewModel)
                 }
             }
+        }
+    }
+
+    override fun onResume() {
+        Log.d("MainActivity", "onResume")
+        super.onResume()
+        if (::viewModel.isInitialized) {
+            viewModel.startListening()
+        } else {
+            Log.e("MainActivity", "viewModel is not initialized yet")
         }
     }
 }
 
 @Composable
-fun EnterSimulator() {
+fun EnterSimulator(viewModel: MainViewModel) {
     val context = LocalContext.current
 
     val launcher = rememberLauncherForActivityResult(
@@ -119,6 +131,8 @@ fun EnterSimulator() {
         Button(onClick = {
             val intent = Intent(context, SimulatorActivity::class.java)
             launcher.launch(intent)
+            //stop the real sensors listening
+            viewModel.stopListening()
         }) {
             Text(text = "Enter Simulator")
         }

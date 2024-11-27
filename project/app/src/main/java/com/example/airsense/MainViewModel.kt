@@ -1,15 +1,6 @@
 package com.example.airsense
 
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.setValue
-import androidx.lifecycle.ViewModel
-import com.example.airsense.detector.algorithm.FlightDetectionAlgorithm
-import com.example.airsense.detector.algorithm.SensorType
 import com.example.airsense.detector.sensors.MeasurableSensor
-import com.example.airsense.detector.sensors.SimulatedAccelerometerSensor
-import com.example.airsense.detector.sensors.SimulatedBarometerSensor
-import com.example.airsense.detector.sensors.SimulatedOrientationSensor
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import javax.inject.Named
@@ -18,33 +9,30 @@ import kotlin.math.sqrt
 @HiltViewModel
 class MainViewModel @Inject constructor(
     @Named("realAccelerometerSensor") private val realAccelerometerSensor: MeasurableSensor,
-    @Named("simulatedAccelerometerSensor") private var simulatedAccelerometerSensor: MeasurableSensor,
 
     @Named("realOrientationSensor") private val realOrientationSensor: MeasurableSensor,
-    @Named("simulatedOrientationSensor") private var simulatedOrientationSensor: MeasurableSensor,
 
-    @Named("realBarometerSensor") private val realBarometerSensor: MeasurableSensor,
-    @Named("simulatedBarometerSensor") private var simulatedBarometerSensor: MeasurableSensor
-) : ViewModel() {
+    @Named("realBarometerSensor") private val realBarometerSensor: MeasurableSensor
+) : BaseViewModel() {
 
-    var absoluteAcceleration by mutableStateOf(0f)
-    var useFakeSensor by mutableStateOf(false)
-
-    var currentTimestamp by mutableStateOf(0L)
-    var lastTimestamp by mutableStateOf(0L)
-    var timeBetweenPoints by mutableStateOf(0L)
-
-    var pitch by mutableStateOf(0f)
-    var roll by mutableStateOf(0f)
-    var yaw by mutableStateOf(0f)
-
-    var pressure by mutableStateOf(0f)
+//    var absoluteAcceleration by mutableStateOf(0f)
+//    var useFakeSensor by mutableStateOf(false)
+//
+//    var currentTimestamp by mutableStateOf(0L)
+//    var lastTimestamp by mutableStateOf(0L)
+//    var timeBetweenPoints by mutableStateOf(0L)
+//
+//    var pitch by mutableStateOf(0f)
+//    var roll by mutableStateOf(0f)
+//    var yaw by mutableStateOf(0f)
+//
+//    var pressure by mutableStateOf(0f)
 
     private lateinit var currentAccelerometerSensor: MeasurableSensor
     private lateinit var currentOrientationSensor: MeasurableSensor
     private lateinit var currentBarometerSensor: MeasurableSensor
 
-    private val flightDetectionAlgorithm = FlightDetectionAlgorithm()
+//    private val flightDetectionAlgorithm = FlightDetectionAlgorithm()
 
     init {
         // Start with the real accelerometer sensor by default
@@ -71,50 +59,51 @@ class MainViewModel @Inject constructor(
             val acceleration = sqrt(x * x + y * y + z * z.toDouble()).toFloat()
             absoluteAcceleration = acceleration
 
-            flightDetectionAlgorithm.onSensorData(SensorType.ACCELEROMETER, values)
+//            flightDetectionAlgorithm.onSensorData(SensorType.ACCELEROMETER, values)
 
             // Calculate the time between points
-            lastTimestamp = currentTimestamp
-            currentTimestamp = timestamp
+            lastTimestamp = accelCurrentTimestamp
+            accelCurrentTimestamp = timestamp
             if (lastTimestamp != 0L) {
-                timeBetweenPoints = currentTimestamp - lastTimestamp
+                timeBetweenPoints = accelCurrentTimestamp - lastTimestamp
             }
         }
     }
 
     fun toggleSensor() {
         // Stop the current sensor
-        currentAccelerometerSensor.stopListening()
-        currentOrientationSensor.stopListening()
-        currentBarometerSensor.stopListening()
-
-        //clear the deques in the flight detection algorithm
-        flightDetectionAlgorithm.reset()
-
-        // Toggle between real and fake sensors
-        useFakeSensor = !useFakeSensor
-        currentAccelerometerSensor = if (useFakeSensor) {
-            simulatedAccelerometerSensor
-        } else {
-            realAccelerometerSensor
-        }
-
-        currentOrientationSensor = if (useFakeSensor) {
-            simulatedOrientationSensor
-        } else {
-            realOrientationSensor
-        }
-
-        currentBarometerSensor = if (useFakeSensor) {
-            simulatedBarometerSensor
-        } else {
-            realBarometerSensor
-        }
-
-        // Start the new sensor
-        startAccelerometerSensor()
-        startOrientationSensor()
-        startBarometerSensor()
+//        currentAccelerometerSensor.stopListening()
+//        currentOrientationSensor.stopListening()
+//        currentBarometerSensor.stopListening()
+//
+//        //clear the deques in the flight detection algorithm
+//        flightDetectionAlgorithm.reset()
+//
+//        // Toggle between real and fake sensors
+//        useFakeSensor = !useFakeSensor
+//        currentAccelerometerSensor = if (useFakeSensor) {
+//            simulatedAccelerometerSensor
+//        } else {
+//            realAccelerometerSensor
+//        }
+//
+//        currentOrientationSensor = if (useFakeSensor) {
+//            simulatedOrientationSensor
+//        } else {
+//            realOrientationSensor
+//        }
+//
+//        currentBarometerSensor = if (useFakeSensor) {
+//            simulatedBarometerSensor
+//        } else {
+//            realBarometerSensor
+//        }
+//
+//        // Start the new sensor
+//        startAccelerometerSensor()
+//        startOrientationSensor()
+//        startBarometerSensor()
+//        Log.d("MainViewModel", "Using ${if (useFakeSensor) "fake" else "real"} sensor.")
     }
 
     private fun startOrientationSensor() {
@@ -149,7 +138,7 @@ class MainViewModel @Inject constructor(
                 pitch = z
             }
 
-            flightDetectionAlgorithm.onSensorData(SensorType.ORIENTATION, values)
+//            flightDetectionAlgorithm.onSensorData(SensorType.ORIENTATION, values)
 
             // Temporary string formatting to limit the number of decimal places
             yaw = String.format("%.2f", yaw).toFloat()
@@ -165,7 +154,7 @@ class MainViewModel @Inject constructor(
             val timestamp = values[0].toLong()
             pressure = values[1].toFloat()
 
-            flightDetectionAlgorithm.onSensorData(SensorType.BAROMETER, values)
+//            flightDetectionAlgorithm.onSensorData(SensorType.BAROMETER, values)
         }
     }
 
@@ -173,43 +162,18 @@ class MainViewModel @Inject constructor(
         super.onCleared()
         currentAccelerometerSensor.stopListening()
         currentOrientationSensor.stopListening()
+        currentBarometerSensor.stopListening()
     }
 
-    fun setSimulatedData(dataStreams: List<List<Pair<Long, DoubleArray>>>) {
-        if (dataStreams.isNotEmpty()) {
-            var accelerometerData: List<Pair<Long, DoubleArray>>? = null
-            var orientationData: List<Pair<Long, DoubleArray>>? = null
-            var barometerData: List<Pair<Long, DoubleArray>>? = null
-
-            for (dataStream in dataStreams) {
-                when {
-                    dataStream.isNotEmpty() && dataStream[0].second.size == 3 -> { // Assuming size 3 corresponds to accelerometer (x, y, z)
-                        accelerometerData = dataStream
-                    }
-                    dataStream.isNotEmpty() && dataStream[0].second.size == 3 -> { // Assuming size 3 corresponds to orientation (pitch, roll, yaw)
-                        orientationData = dataStream
-                    }
-                    dataStream.isNotEmpty() && dataStream[0].second.size == 1 -> { // Assuming size 1 corresponds to barometer (pressure)
-                        barometerData = dataStream
-                    }
-                }
-            }
-
-            accelerometerData?.let {
-                simulatedAccelerometerSensor.loadData(it) // Load accelerometer data
-                simulatedAccelerometerSensor.startListening() // Start the sensor
-            }
-
-            orientationData?.let {
-                simulatedOrientationSensor.loadData(it) // Load orientation data
-                simulatedOrientationSensor.startListening() // Start the sensor
-            }
-
-            barometerData?.let {
-                simulatedBarometerSensor.loadData(it) // Load barometer data
-                simulatedBarometerSensor.startListening() // Start the sensor
-            }
-        }
+    fun stopListening() {
+        currentAccelerometerSensor.stopListening()
+        currentOrientationSensor.stopListening()
+        currentBarometerSensor.stopListening()
     }
 
+    fun startListening() {
+        currentAccelerometerSensor.startListening()
+        currentOrientationSensor.startListening()
+        currentBarometerSensor.startListening()
+    }
 }
