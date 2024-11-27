@@ -50,12 +50,21 @@ class SimulationViewModel @Inject constructor(
                 timeBetweenPoints = accelCurrentTimestamp - lastTimestamp
             }
             // Add accelerometer data to the queue
-            accelerometerQueue.add(accelValues)
+            synchronized(accelerometerQueue) {
+                accelerometerQueue.add(accelValues)
+            }
             // Check if both queues have sufficient data
-            if (!isProcessing && accelerometerQueue.size >= 7000 && barometerQueue.size >= 7000) {
-                isProcessing = true
-                processNextBatch(accelerometerQueue, barometerQueue)
-                isProcessing = false
+            synchronized(this) {
+                if (!isProcessing && accelerometerQueue.size >= 7000 && barometerQueue.size >= 7000) {
+                    isProcessing = true
+                    processNextBatch(
+                        accelerometerQueue.take(7000),
+                        barometerQueue.take(7000)
+                    ) // Only send batches
+                    removeOldestData(accelerometerQueue, 3000) // Remove 3k oldest points
+                    removeOldestData(barometerQueue, 3000) // Remove 3k oldest points
+                    isProcessing = false
+                }
             }
 
         }
@@ -74,25 +83,19 @@ class SimulationViewModel @Inject constructor(
                 Thread.sleep(1) // Simple throttle to ensure synchronization
             }
 
-            barometerQueue.add(baroValues)
+            synchronized(barometerQueue) {
+                barometerQueue.add(baroValues)
+            }
         }
 
     }
 
     private fun processNextBatch(
-        accelerometerQueue: ArrayDeque<List<Double>>,
-        barometerQueue: ArrayDeque<List<Double>>
+        accelBatch: List<List<Double>>,
+        baroBatch: List<List<Double>>
     ) {
-        // Take the first 15k points from both queues
-        val accelerometerData = accelerometerQueue.take(7000)
-        val barometerData = barometerQueue.take(7000)
-
-        // Send data to the flight detection algorithm
-        processCombinedData(accelerometerData, barometerData)
-
-        // Remove the oldest 10k points, leaving a carryover of 5k
-        trimQueue(accelerometerQueue, 4000)
-        trimQueue(barometerQueue, 4000)
+        // Send the 7k points to the algorithm
+        processCombinedData(accelBatch, baroBatch)
     }
 
     // Function to process combined data
@@ -103,11 +106,14 @@ class SimulationViewModel @Inject constructor(
         flightDetectionAlgorithm.processData(accelerometerData, barometerData)
     }
 
-    // Function to trim the queue to retain the latest 'retainSize' elements
-    private fun <T> trimQueue(queue: ArrayDeque<T>, retainSize: Int) {
-        while (queue.size > retainSize) {
-            queue.removeFirst()
+    private fun <T> removeOldestData(queue: ArrayDeque<T>, removeCount: Int) {
+        val originalSize = queue.size
+        synchronized(queue) {
+            repeat(removeCount.coerceAtMost(queue.size)) { // Avoid removing more than the queue size
+                queue.removeFirst()
+            }
         }
+//        Log.d("SimulationViewModel", "Trimmed queue from $originalSize to ${queue.size}")
     }
 
     fun setSimulatedData(dataStreams: Map<CSVDataLoader.DataType, MutableList<List<Pair<Long, DoubleArray>>>>) {

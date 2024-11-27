@@ -1,6 +1,5 @@
 package com.example.airsense
 
-import com.example.airsense.detector.algorithm.SensorType
 import com.example.airsense.detector.sensors.MeasurableSensor
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -60,7 +59,7 @@ class MainViewModel @Inject constructor(
             val acceleration = sqrt(x * x + y * y + z * z.toDouble()).toFloat()
             absoluteAcceleration = acceleration
 
-            flightDetectionAlgorithm.onSensorData(SensorType.ACCELEROMETER, values)
+//            flightDetectionAlgorithm.onSensorData(SensorType.ACCELEROMETER, values)
 
             // Calculate the time between points
             lastTimestamp = accelCurrentTimestamp
@@ -139,7 +138,7 @@ class MainViewModel @Inject constructor(
                 pitch = z
             }
 
-            flightDetectionAlgorithm.onSensorData(SensorType.ORIENTATION, values)
+//            flightDetectionAlgorithm.onSensorData(SensorType.ORIENTATION, values)
 
             // Temporary string formatting to limit the number of decimal places
             yaw = String.format("%.2f", yaw).toFloat()
@@ -155,7 +154,7 @@ class MainViewModel @Inject constructor(
             val timestamp = values[0].toLong()
             pressure = values[1].toFloat()
 
-            flightDetectionAlgorithm.onSensorData(SensorType.BAROMETER, values)
+//            flightDetectionAlgorithm.onSensorData(SensorType.BAROMETER, values)
         }
     }
 

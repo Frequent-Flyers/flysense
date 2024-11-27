@@ -153,7 +153,7 @@ class FlightDetectionAlgorithm {
                                 validTakeoffSpotFound = true
                                 Log.d(
                                     "TakeoffDetection",
-                                    "Valid takeoff spot found. Duration: ${currentTime - takeoffStartTime} seconds, Max Variance: $currentMaxVariance"
+                                    "Valid takeoff spot found. Time: $takeoffStartTime , Max Variance: $currentMaxVariance"
                                 )
                                 currentMaxVariance = 0.0
                             }
@@ -171,6 +171,7 @@ class FlightDetectionAlgorithm {
 //                if (currentTime > peakEndTime) {
 //                    break
 //                }
+//                    println("current time - endtime: ${currentTime - endTime}")
 
                     if (currentTime - endTime <= 30) {
                         currentAcceleration = smoothedAcceleration[i]
