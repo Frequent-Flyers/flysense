@@ -11,23 +11,11 @@ class FlightDetectionAlgorithm {
     private var latestPressures = mutableListOf<Double>()
 
     fun reset() {
-    }
-
-    fun onSensorData(
-        sensorType: SensorType,
-        sensorData: List<Double>
-    ) {
-//        when (sensorType) {
-//            SensorType.ACCELEROMETER -> {
-//                processData(sensorData, emptyList())
-//            }
-//            SensorType.BAROMETER -> {
-//                processData(emptyList(), sensorData)
-//            }
-//            else -> {
-//                Log.e("FlightDetectionAlgorithm", "Unsupported sensor type")
-//            }
-//        }
+        lastFlightState = FlightState.GROUNDED
+        flightStartTime = 0.0
+        flightState = FlightState.GROUNDED
+        firstTimeStamp = 0.0
+        latestPressures.clear()
     }
 
     fun processData(accelerometerData: List<List<Double>>, barometerData: List<List<Double>>) {

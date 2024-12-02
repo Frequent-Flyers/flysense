@@ -4,7 +4,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
-import com.example.airsense.detector.algorithm.FlightDetectionAlgorithm
 
 open class BaseViewModel : ViewModel() {
     // Base view model logic goes here
@@ -21,5 +20,5 @@ open class BaseViewModel : ViewModel() {
     var pressure by mutableStateOf(0f)
 
     // Shared flight detection algorithm
-    protected val flightDetectionAlgorithm = FlightDetectionAlgorithm()
+//    protected val flightDetectionAlgorithm = FlightDetectionAlgorithm()
 }

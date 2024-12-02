@@ -1,6 +1,7 @@
 package com.example.airsense
 
 import android.util.Log
+import com.example.airsense.detector.algorithm.FlightDetectionAlgorithm
 import com.example.airsense.detector.sensors.MeasurableSensor
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -10,16 +11,17 @@ import kotlin.math.sqrt
 @HiltViewModel
 class SimulationViewModel @Inject constructor(
     @Named("simulatedAccelerometerSensor") private var simulatedAccelerometerSensor: MeasurableSensor,
-
-//    @Named("simulatedOrientationSensor") private var simulatedOrientationSensor: MeasurableSensor,
-
     @Named("simulatedBarometerSensor") private var simulatedBarometerSensor: MeasurableSensor
 ) : BaseViewModel() {
     var timeElapsed = 0L
+    private val flightDetectionAlgorithm = FlightDetectionAlgorithm()
+    private val batchSize = 7000
+    private val carryOver = 4000
 
     // Simulation-specific logic goes here
     init {
         // Start simulated sensors and use shared methods from BaseViewModel
+        flightDetectionAlgorithm.reset()
         startSimulatedSensors()
     }
 
@@ -55,14 +57,20 @@ class SimulationViewModel @Inject constructor(
             }
             // Check if both queues have sufficient data
             synchronized(this) {
-                if (!isProcessing && accelerometerQueue.size >= 7000 && barometerQueue.size >= 7000) {
+                if (!isProcessing && accelerometerQueue.size >= batchSize && barometerQueue.size >= batchSize) {
                     isProcessing = true
                     processNextBatch(
-                        accelerometerQueue.take(7000),
-                        barometerQueue.take(7000)
+                        accelerometerQueue.take(batchSize),
+                        barometerQueue.take(batchSize)
                     ) // Only send batches
-                    removeOldestData(accelerometerQueue, 3000) // Remove 3k oldest points
-                    removeOldestData(barometerQueue, 3000) // Remove 3k oldest points
+                    removeOldestData(
+                        accelerometerQueue,
+                        batchSize - carryOver
+                    ) // Remove 3k oldest points
+                    removeOldestData(
+                        barometerQueue,
+                        batchSize - carryOver
+                    ) // Remove 3k oldest points
                     isProcessing = false
                 }
             }
