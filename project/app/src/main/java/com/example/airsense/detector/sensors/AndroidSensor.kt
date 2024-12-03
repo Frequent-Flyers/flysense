@@ -10,7 +10,7 @@ abstract class AndroidSensor(
     private val context: Context,
     private val sensorFeature: String,
     sensorType: Int
-): MeasurableSensor(sensorType), SensorEventListener {
+) : MeasurableSensor(sensorType), SensorEventListener {
 
     override val doesSensorExist: Boolean
         get() = context.packageManager.hasSystemFeature(sensorFeature)
@@ -19,30 +19,30 @@ abstract class AndroidSensor(
     private var sensor: Sensor? = null
 
     override fun startListening() {
-        if(!doesSensorExist) {
+        if (!doesSensorExist) {
             return
         }
-        if(!::sensorManager.isInitialized && sensor == null) {
+        if (!::sensorManager.isInitialized && sensor == null) {
             sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
             sensor = sensorManager.getDefaultSensor(sensorType)
         }
         sensor?.let {
-            sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_NORMAL)
+            sensorManager.registerListener(this, it, SensorManager.SENSOR_DELAY_GAME)
         }
     }
 
     override fun stopListening() {
-        if(!doesSensorExist || !::sensorManager.isInitialized) {
+        if (!doesSensorExist || !::sensorManager.isInitialized) {
             return
         }
         sensorManager.unregisterListener(this)
     }
 
     override fun onSensorChanged(event: SensorEvent?) {
-        if(!doesSensorExist) {
+        if (!doesSensorExist) {
             return
         }
-        if(event?.sensor?.type == sensorType) {
+        if (event?.sensor?.type == sensorType) {
 //            // Convert SensorEvent.timestamp to Unix time (milliseconds)
 //            val bootTimeMillis = System.currentTimeMillis() - SystemClock.elapsedRealtime()
 //            val unixTime = bootTimeMillis + event.timestamp / 1_000_000L

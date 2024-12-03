@@ -9,25 +9,19 @@ class FlightDetectionAlgorithm {
     private var flightState = FlightState.GROUNDED
     var firstTimeStamp = 0.0
     private var latestPressures = mutableListOf<Double>()
+    private var frequency = 100
 
     fun reset() {
+        lastFlightState = FlightState.GROUNDED
+        flightStartTime = 0.0
+        flightState = FlightState.GROUNDED
+        firstTimeStamp = 0.0
+        latestPressures.clear()
     }
 
-    fun onSensorData(
-        sensorType: SensorType,
-        sensorData: List<Double>
-    ) {
-//        when (sensorType) {
-//            SensorType.ACCELEROMETER -> {
-//                processData(sensorData, emptyList())
-//            }
-//            SensorType.BAROMETER -> {
-//                processData(emptyList(), sensorData)
-//            }
-//            else -> {
-//                Log.e("FlightDetectionAlgorithm", "Unsupported sensor type")
-//            }
-//        }
+    fun adjustFrequency(newFrequency: Int) {
+        println("adjusting frequency")
+        frequency = newFrequency
     }
 
     fun processData(accelerometerData: List<List<Double>>, barometerData: List<List<Double>>) {
@@ -55,10 +49,11 @@ class FlightDetectionAlgorithm {
             val (_, x, y, z) = it
             Math.sqrt(x * x + y * y + z * z)
         }
-
+        
         val smoothedAcceleration =
-            movingAverage(absoluteAcceleration, 997) //make it dynamic based on the data
-        val varianceAcceleration = variance(absoluteAcceleration, 997)
+            movingAverage(absoluteAcceleration, 10 * frequency) //10 seconds moving average
+        val varianceAcceleration =
+            variance(absoluteAcceleration, 10 * frequency) //10 seconds variance
 
         // Interpolate barometer data to match accelerometer timestamps
         //val interpolatedBarometerData = interpolateBarometerData(barometerData.toList(), timestamps)

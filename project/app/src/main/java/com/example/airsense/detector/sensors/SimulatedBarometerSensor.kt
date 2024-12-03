@@ -13,7 +13,7 @@ class SimulatedBarometerSensor(
     private val speed: Double
 ) : MeasurableSensor(Sensor.TYPE_PRESSURE) {
 
-    private var sensorData: List<Pair<Long, DoubleArray>> = csvDataLoader.loadData()
+    private var sensorData: List<Pair<Long, DoubleArray>> = csvDataLoader.loadData().first
     private var sensorJob: Job? = null
     private var coefficient = 1.0 / speed
 

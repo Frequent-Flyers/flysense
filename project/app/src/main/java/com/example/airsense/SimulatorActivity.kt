@@ -6,12 +6,12 @@ import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
 import android.util.Log
+import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.activity.viewModels
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -21,7 +21,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
-import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -31,7 +30,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.airsense.ui.theme.AirsenseTheme
@@ -39,46 +37,27 @@ import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
 class SimulatorActivity() : ComponentActivity() {
-    private val simulationViewModel: SimulationViewModel by viewModels()
+    private lateinit var simulationViewModel: SimulationViewModel
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
             AirsenseTheme {
-                val viewModel = viewModel<SimulationViewModel>()
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Column(
-                        modifier = Modifier
-                            .padding(innerPadding)
-                            .fillMaxSize()
-                            .padding(16.dp)
-                    ) {
-                        Greeting("Android")
-                        Spacer(modifier = Modifier.height(16.dp))
-                        MultiFilePicker(viewModel)
-                    }
-
-                    DisplaySensorValues(viewModel)
+                simulationViewModel = viewModel<SimulationViewModel>()
+                Column(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(16.dp)
+                ) {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    MultiFilePicker(simulationViewModel)
                 }
+
+                DisplaySensorValues(simulationViewModel)
+
             }
         }
-    }
-}
-
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
-
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    AirsenseTheme {
-        Greeting("Android")
     }
 }
 
@@ -89,75 +68,88 @@ fun MultiFilePicker(viewModel: SimulationViewModel) {
         rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
             val dataStreams = mapOf(
                 CSVDataLoader.DataType.ACCELEROMETER to mutableListOf<List<Pair<Long, DoubleArray>>>(),
-//                CSVDataLoader.DataType.ORIENTATION to mutableListOf<List<Pair<Long, DoubleArray>>>(),
                 CSVDataLoader.DataType.BAROMETER to mutableListOf<List<Pair<Long, DoubleArray>>>()
             )
-            var accelerometerTimestamps: List<Long> = emptyList()
+            var accelerometerData: List<Pair<Long, DoubleArray>>? = null
+            var barometerData: List<Pair<Long, DoubleArray>>? = null
+            var frequency: Double? = null
 
             uris.forEach { uri ->
                 context.contentResolver.openInputStream(uri)?.use { inputStream ->
                     val name = getFileNameFromUri(context.contentResolver, uri)
-                    var dataType: CSVDataLoader.DataType = CSVDataLoader.DataType.UNKNOWN
+                    val dataType = when {
+                        name?.contains(
+                            "Accelerometer",
+                            ignoreCase = true
+                        ) == true -> CSVDataLoader.DataType.ACCELEROMETER
 
-                    Log.d("SimulatorActivity", "File name: $name")
+                        name?.contains(
+                            "Barometer",
+                            ignoreCase = true
+                        ) == true -> CSVDataLoader.DataType.BAROMETER
 
-                    if (name != null) {
-                        dataType = when {
-                            name.contains(
-                                "Accelerometer",
-                                ignoreCase = true
-                            ) -> CSVDataLoader.DataType.ACCELEROMETER
-
-//                            name.contains(
-//                                "Orientation",
-//                                ignoreCase = true
-//                            ) -> CSVDataLoader.DataType.ORIENTATION
-
-                            name.contains(
-                                "Barometer",
-                                ignoreCase = true
-                            ) -> CSVDataLoader.DataType.BAROMETER
-
-                            else -> CSVDataLoader.DataType.UNKNOWN
-                        }
+                        else -> CSVDataLoader.DataType.UNKNOWN
                     }
 
-                    Log.d("SimulatorActivity", "Data type: $dataType")
+                    Log.d("SimulatorActivity", "File name: $name, Data type: $dataType")
 
                     val csvDataLoader = CSVDataLoader(inputStream, dataType)
-                    val data = csvDataLoader.loadData()
+                    val result = csvDataLoader.loadData()
+                    val data = result.first
 
                     if (data.isNotEmpty()) {
                         when (dataType) {
                             CSVDataLoader.DataType.ACCELEROMETER -> {
-                                dataStreams[dataType]?.add(data)
-                                // Save accelerometer timestamps for interpolation
-                                accelerometerTimestamps = data.map { it.first }
+                                accelerometerData = data
+                                frequency = result.second
+                                viewModel.frequency = frequency!!
+                                Log.d(
+                                    "SimulatorActivity",
+                                    "Loaded accelerometer data: ${data.size} points"
+                                )
                             }
 
                             CSVDataLoader.DataType.BAROMETER -> {
-                                if (accelerometerTimestamps.isNotEmpty()) {
-                                    Log.d("SimulatorActivity", "Interpolating barometer data")
-                                    // Interpolate barometer data to match accelerometer timestamps
-                                    val interpolatedBarometerData =
-                                        interpolateBarometerData(data, accelerometerTimestamps)
-                                    dataStreams[dataType]?.add(interpolatedBarometerData)
-                                } else {
-                                    dataStreams[dataType]?.add(data)
-                                }
+                                barometerData = data
+                                Log.d(
+                                    "SimulatorActivity",
+                                    "Loaded barometer data: ${data.size} points"
+                                )
                             }
 
-                            else -> { /* Do nothing for unknown types */
-                            }
+                            else -> Log.e("SimulatorActivity", "Unknown data type")
                         }
                     }
                 }
             }
 
-            viewModel.setSimulatedData(dataStreams)
+            // Process data after both accelerometer and barometer are loaded
+            if (accelerometerData != null && barometerData != null) {
+                Log.d(
+                    "SimulatorActivity",
+                    "Both files have been loaded -> Interpolating barometerdata"
+                )
+                val accelerometerTimestamps = accelerometerData!!.map { it.first }
+                val interpolatedBarometerData =
+                    interpolateBarometerData(barometerData!!, accelerometerTimestamps)
+                dataStreams[CSVDataLoader.DataType.ACCELEROMETER]?.add(accelerometerData!!)
+                dataStreams[CSVDataLoader.DataType.BAROMETER]?.add(interpolatedBarometerData)
+                viewModel.setSimulatedData(dataStreams)
+            } else {
+                Log.e("SimulatorActivity", "Both files must be selected to proceed")
+                if (accelerometerData == null) {
+                    Toast.makeText(
+                        context,
+                        "Please select an accelerometer file.",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                } else {
+                    Toast.makeText(context, "Please select a barometer file.", Toast.LENGTH_SHORT)
+                        .show()
+                }
+            }
         }
 
-    // track if the picker should be launched
     var shouldLaunchPicker by remember { mutableStateOf(false) }
 
     if (shouldLaunchPicker) {

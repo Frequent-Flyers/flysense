@@ -31,8 +31,8 @@ class MainActivity : ComponentActivity() {
     private lateinit var viewModel: MainViewModel
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        Log.d("MainActivity", "onCreate")
         super.onCreate(savedInstanceState)
+        Log.d("MainActivity", "onCreate")
         setContent {
             AirsenseTheme {
                 viewModel = viewModel<MainViewModel>()

@@ -1,5 +1,6 @@
 package com.example.airsense
 
+import com.example.airsense.detector.algorithm.FlightDetectionAlgorithm
 import com.example.airsense.detector.sensors.MeasurableSensor
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -14,23 +15,16 @@ class MainViewModel @Inject constructor(
 
     @Named("realBarometerSensor") private val realBarometerSensor: MeasurableSensor
 ) : BaseViewModel() {
-
-//    var absoluteAcceleration by mutableStateOf(0f)
-//    var useFakeSensor by mutableStateOf(false)
-//
-//    var currentTimestamp by mutableStateOf(0L)
-//    var lastTimestamp by mutableStateOf(0L)
-//    var timeBetweenPoints by mutableStateOf(0L)
-//
-//    var pitch by mutableStateOf(0f)
-//    var roll by mutableStateOf(0f)
-//    var yaw by mutableStateOf(0f)
-//
-//    var pressure by mutableStateOf(0f)
+    private val flightDetectionAlgorithm = FlightDetectionAlgorithm()
 
     private lateinit var currentAccelerometerSensor: MeasurableSensor
     private lateinit var currentOrientationSensor: MeasurableSensor
     private lateinit var currentBarometerSensor: MeasurableSensor
+    private var accelQueue = ArrayDeque<List<Double>>()
+    private var baroQueue = ArrayDeque<List<Double>>()
+    private val batchSize = 7000 / 2 // 50 Hz
+    private val carryOver = 4000 / 2 // 50 Hz
+    var isProcessing = false
 
 //    private val flightDetectionAlgorithm = FlightDetectionAlgorithm()
 
@@ -40,8 +34,8 @@ class MainViewModel @Inject constructor(
         currentOrientationSensor = realOrientationSensor
         currentBarometerSensor = realBarometerSensor
         startAccelerometerSensor()
-        startOrientationSensor()
         startBarometerSensor()
+        flightDetectionAlgorithm.adjustFrequency(50)
     }
 
     private fun startAccelerometerSensor() {
@@ -66,6 +60,18 @@ class MainViewModel @Inject constructor(
             accelCurrentTimestamp = timestamp
             if (lastTimestamp != 0L) {
                 timeBetweenPoints = accelCurrentTimestamp - lastTimestamp
+            }
+            accelQueue.add(values)
+
+            if (!isProcessing && accelQueue.size >= batchSize && baroQueue.size >= batchSize) {
+                isProcessing = true
+                processNextBatch(
+                    accelQueue.take(batchSize),
+                    baroQueue.take(batchSize)
+                ) // Only send batches
+                removeOldestData(accelQueue, batchSize - carryOver) // Remove 3k oldest points
+                removeOldestData(baroQueue, batchSize - carryOver) // Remove 3k oldest points
+                isProcessing = false
             }
         }
     }
@@ -106,46 +112,6 @@ class MainViewModel @Inject constructor(
 //        Log.d("MainViewModel", "Using ${if (useFakeSensor) "fake" else "real"} sensor.")
     }
 
-    private fun startOrientationSensor() {
-        currentOrientationSensor.startListening()
-        currentOrientationSensor.setOnSensorValuesChangedListener { values ->
-            // First value is the timestamp
-            val timestamp = values[0].toLong()
-
-            // Remaining values are the yaw, qx, qz, roll, qw, qy, pitch sensor readings
-            var x = values[1].toFloat()
-            var y = values[2].toFloat()
-            var z = values[3].toFloat()
-
-            if (currentOrientationSensor == realOrientationSensor) {
-                var scalar = values[4].toFloat()
-                var headingAcc = values[5].toFloat()
-
-                // Correct calculation of pitch, roll, and yaw from the quaternion values
-                roll = Math.asin((2 * (scalar * y - z * x)).toDouble())
-                    .toFloat() * (180 / Math.PI.toFloat())  // Rotation around X-axis
-                pitch = Math.atan2(
-                    (2 * (scalar * x + y * z)).toDouble(),
-                    (1 - 2 * (x * x + y * y)).toDouble()
-                ).toFloat() * (180 / Math.PI.toFloat())  // Rotation around Y-axis
-                yaw = Math.atan2(
-                    (2 * (scalar * z + x * y)).toDouble(),
-                    (1 - 2 * (y * y + z * z)).toDouble()
-                ).toFloat() * (180 / Math.PI.toFloat())  // Rotation around Z-axis
-            } else {
-                yaw = x
-                roll = y
-                pitch = z
-            }
-
-//            flightDetectionAlgorithm.onSensorData(SensorType.ORIENTATION, values)
-
-            // Temporary string formatting to limit the number of decimal places
-            yaw = String.format("%.2f", yaw).toFloat()
-            roll = String.format("%.2f", roll).toFloat()
-            pitch = String.format("%.2f", pitch).toFloat()
-        }
-    }
 
     private fun startBarometerSensor() {
         currentBarometerSensor.startListening()
@@ -155,6 +121,32 @@ class MainViewModel @Inject constructor(
             pressure = values[1].toFloat()
 
 //            flightDetectionAlgorithm.onSensorData(SensorType.BAROMETER, values)
+
+            baroQueue.add(values)
+        }
+    }
+
+    private fun processNextBatch(
+        accelBatch: List<List<Double>>,
+        baroBatch: List<List<Double>>
+    ) {
+        // Send the 7k points to the algorithm
+        processCombinedData(accelBatch, baroBatch)
+    }
+
+    // Function to process combined data
+    private fun processCombinedData(
+        accelerometerData: List<List<Double>>,
+        barometerData: List<List<Double>>
+    ) {
+        flightDetectionAlgorithm.processData(accelerometerData, barometerData)
+    }
+
+    private fun <T> removeOldestData(queue: ArrayDeque<T>, removeCount: Int) {
+        synchronized(queue) {
+            repeat(removeCount.coerceAtMost(queue.size)) { // Avoid removing more than the queue size
+                queue.removeFirst()
+            }
         }
     }
 
