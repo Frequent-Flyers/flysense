@@ -11,23 +11,24 @@ class CSVDataLoader(private val inputStream: InputStream?, private val dataType:
         ACCELEROMETER, BAROMETER, UNKNOWN
     }
 
-    fun loadData(): List<Pair<Long, DoubleArray>> {
+    fun loadData(): Pair<MutableList<Pair<Long, DoubleArray>>, Double> {
         if (inputStream == null) {
             Log.e("CSVDataLoader", "Input stream is null.")
-            return emptyList()
+            return Pair(mutableListOf(), 0.0)
         }
 
         val result = mutableListOf<Pair<Long, DoubleArray>>()
         val reader = BufferedReader(InputStreamReader(inputStream))
+        val timestamps = mutableListOf<Long>()
 
         reader.useLines { lines ->
             lines.drop(1).forEach { line -> // Drop the header row
                 val values = line.split(",")
+                val timestamp = values[0].toLong()
+                timestamps.add(timestamp)
 
                 when (dataType) {
                     DataType.ACCELEROMETER -> {
-                        // Timestamp is in the first column
-                        val timestamp = values[0].toLong()
                         // x, y, z values are in the 5th, 4th, and 3rd columns, respectively
                         val x = values[4].toDouble()
                         val y = values[3].toDouble()
@@ -60,8 +61,6 @@ class CSVDataLoader(private val inputStream: InputStream?, private val dataType:
 //                    }
 
                     DataType.BAROMETER -> {
-                        // Timestamp is in the first column
-                        val timestamp = values[0].toLong()
                         // Pressure value is in the 4th column
                         val pressure = values[3].toDouble()
                         //create list and add timestamp and pressure data
@@ -78,11 +77,17 @@ class CSVDataLoader(private val inputStream: InputStream?, private val dataType:
                         Log.e("CSVDataLoader", "Unknown data type.")
                     }
                 }
+
             }
+            // Calculate frequency
+            val intervals = timestamps.zipWithNext { first, second -> second - first }
+            val averageInterval = intervals.average() / 1_000_000_000.0 // Convert ns to seconds
+            val frequency = if (averageInterval > 0) 1.0 / averageInterval else 0.0
 
             Log.d("CSVDataLoader", "Loaded ${result.size} data points for $dataType.")
+            Log.d("CSVDataLoader", "Calculated frequency: $frequency Hz.")
 
-            return result
+            return Pair(result, frequency)
         }
     }
 }

@@ -6,6 +6,7 @@ import com.example.airsense.detector.sensors.MeasurableSensor
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
 import javax.inject.Named
+import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
 @HiltViewModel
@@ -15,14 +16,37 @@ class SimulationViewModel @Inject constructor(
 ) : BaseViewModel() {
     var timeElapsed = 0L
     private val flightDetectionAlgorithm = FlightDetectionAlgorithm()
-    private val batchSize = 7000
-    private val carryOver = 4000
+    private val defaultBatchSize = 7000
+    private val defaultCarryOver = 4000
+
+    private var _frequency = 0.0
+    var frequency: Double
+        get() = _frequency
+        set(value) {
+            _frequency = value
+            adjustBatchSizeAndCarryOver() // Recalculate batchSize and carryOver
+        }
+
+    private var batchSize = defaultBatchSize
+    private var carryOver = defaultCarryOver
 
     // Simulation-specific logic goes here
     init {
         // Start simulated sensors and use shared methods from BaseViewModel
         flightDetectionAlgorithm.reset()
         startSimulatedSensors()
+    }
+
+    private fun adjustBatchSizeAndCarryOver() {
+        if (frequency > 0) {
+            //round frequency up to nearest integer
+            var roundedFreq = frequency.roundToInt().toDouble()
+            var adjustment = roundedFreq / 100.0
+            batchSize = (defaultBatchSize * adjustment).toInt()
+            carryOver = (defaultCarryOver * adjustment).toInt()
+            Log.d("SimulationViewModel", "Adjusted batchSize: $batchSize, carryOver: $carryOver")
+            flightDetectionAlgorithm.adjustFrequency(roundedFreq.toInt())
+        }
     }
 
     private fun startSimulatedSensors() {

@@ -35,6 +35,7 @@ class MainViewModel @Inject constructor(
         currentBarometerSensor = realBarometerSensor
         startAccelerometerSensor()
         startBarometerSensor()
+        flightDetectionAlgorithm.adjustFrequency(50)
     }
 
     private fun startAccelerometerSensor() {
