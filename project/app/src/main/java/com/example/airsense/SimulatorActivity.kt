@@ -2,7 +2,6 @@ package com.example.airsense
 
 import android.content.ContentResolver
 import android.database.Cursor
-import android.media.Image
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
@@ -17,14 +16,21 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Settings
@@ -33,23 +39,34 @@ import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.airsense.ui.theme.AirsenseTheme
 import dagger.hilt.android.AndroidEntryPoint
+import java.math.RoundingMode
+import java.util.Locale
 
+var finalTimestamp = 0L
 
 data class BottomNavigationItem(
     val title: String,
@@ -58,7 +75,7 @@ data class BottomNavigationItem(
 )
 
 @AndroidEntryPoint
-class SimulatorActivity() : ComponentActivity() {
+class SimulatorActivity : ComponentActivity() {
     private lateinit var simulationViewModel: SimulationViewModel
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -69,31 +86,32 @@ class SimulatorActivity() : ComponentActivity() {
         setContent {
             AirsenseTheme {
                 simulationViewModel = viewModel<SimulationViewModel>()
-                var selectedItemIndex by remember { mutableStateOf(1) }
+                var selectedItemIndex by remember { mutableIntStateOf(1) }
+                var selectedSensor by remember { mutableStateOf(setOf<String>()) }
 
                 val items = listOf(
                     BottomNavigationItem(
-                        title = "Home",
-                        selectedIcon = Icons.Filled.Home,
-                        unselectedIcon = Icons.Outlined.Home,
+                        title = "Fly",
+                        selectedIcon = ImageVector.vectorResource(id = R.drawable.fly),
+                        unselectedIcon = ImageVector.vectorResource(id = R.drawable.fly),
                     ),
                     BottomNavigationItem(
                         title = "Simulate",
-                        selectedIcon = Icons.Filled.Home,
-                        unselectedIcon = Icons.Outlined.Home,
+                        selectedIcon = ImageVector.vectorResource(id = R.drawable.simulate),
+                        unselectedIcon = ImageVector.vectorResource(id = R.drawable.simulate),
                     ),
                     BottomNavigationItem(
                         title = "Settings",
-                        selectedIcon = Icons.Filled.Settings,
-                        unselectedIcon = Icons.Outlined.Settings
-                    ),
+                        selectedIcon = ImageVector.vectorResource(id = R.drawable.settings),
+                        unselectedIcon = ImageVector.vectorResource(id = R.drawable.settings),
+                    )
                 )
 
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
                     bottomBar = {
                         NavigationBar {
-                            items.forEachIndexed() { index, item ->
+                            items.forEachIndexed { index, item ->
                                 NavigationBarItem(
                                     selected = selectedItemIndex == index,
                                     onClick = {
@@ -108,24 +126,63 @@ class SimulatorActivity() : ComponentActivity() {
                                     icon = {
                                         Icon(
                                             imageVector = if (selectedItemIndex == index) item.selectedIcon else item.unselectedIcon,
-                                            contentDescription = item.title
+                                            contentDescription = item.title,
+                                            modifier = Modifier.size(32.dp)
                                         )
                                     },
                                     label = {
-                                        Text(text = item.title) // Add text under icons
+                                        Text(text = item.title)
                                     }
                                 )
                             }
                         }
                     }
-                ) {
-                    DisplaySensorValues(simulationViewModel)
-                    MultiFilePicker(simulationViewModel)
-                }
+                ) { paddingValues ->
+                    Box(modifier = Modifier.fillMaxSize()) {
+                        // Scrollable content
+                        Column(
+                            modifier = Modifier
+                                .fillMaxSize()
+                                .padding(bottom = paddingValues.calculateBottomPadding())
+                                .verticalScroll(rememberScrollState())
+                        ) {
+                            // DisplaySensorValues(simulationViewModel)
 
+                            if (simulationViewModel.accelFirstTimestamp != 0L) {
+                                SimulationProgressCard(viewModel = simulationViewModel)
+                            }
+                        }
+
+                        // MultiFilePicker at the bottom
+                        if (simulationViewModel.accelFirstTimestamp == 0L) {
+                            Box(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .align(Alignment.BottomCenter)
+                                    .padding(bottom = paddingValues.calculateBottomPadding() + 16.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Column(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalAlignment = Alignment.CenterHorizontally
+                                ) {
+                                    SimulationSensorsCard(
+                                        onSensorSelectionChange = { selectedSensor = it },
+                                        selectedSensors = selectedSensor
+                                    )
+
+                                    MultiFilePicker(simulationViewModel)
+                                }
+                            }
+
+                            Log.d("Selected Sensors", selectedSensor.toString())
+                        }
+                    }
+                }
             }
         }
     }
+
 
     private fun setImmersiveMode() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
@@ -145,6 +202,222 @@ class SimulatorActivity() : ComponentActivity() {
                             or View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
                             or View.SYSTEM_UI_FLAG_FULLSCREEN
                     )
+        }
+    }
+}
+
+@Composable
+fun SimulationProgressCard(
+    viewModel: SimulationViewModel
+) {
+    val elapsed = viewModel.accelCurrentTimestamp - viewModel.accelFirstTimestamp
+    val hours = elapsed / 3600000000000
+    val minutes = (elapsed % 3600000000000) / 60000000000
+    val seconds = (elapsed % 60000000000) / 1000000000
+
+    val totalDuration = finalTimestamp - viewModel.accelFirstTimestamp
+
+    val formattedTime = when {
+        hours > 0 -> String.format(Locale.getDefault(), "%02d:%02d:%02d", hours, minutes, seconds)
+        minutes > 0 -> String.format(Locale.getDefault(), "%02d:%02d", minutes, seconds)
+        else -> String.format(Locale.getDefault(), "00:%02d", seconds)
+    }
+
+    val progress = (elapsed.toDouble() / totalDuration.toDouble() * 100).toInt()
+    val progressColor = Color(0xFF9a78d1)
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp)
+            .clip(RoundedCornerShape(12.dp))
+    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+                .height(100.dp)
+                .clip(RoundedCornerShape(12.dp))
+        ) {
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .background(MaterialTheme.colorScheme.primary)
+            )
+
+            Box(
+                modifier = Modifier
+                    .fillMaxHeight()
+                    .fillMaxWidth(progress / 100f)
+                    .background(progressColor)
+            )
+
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = "Simulation Progress",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                    Text(
+                        text = formattedTime,
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onPrimary
+                    )
+                }
+
+                Text(
+                    text = "${progress}%",
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = MaterialTheme.colorScheme.onPrimary
+                )
+            }
+        }
+
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+                .clip(RoundedCornerShape(12.dp))
+        ) {
+            Column {
+                Text(
+                    text = "Accelerometer",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Acceleration: ${viewModel.absoluteAcceleration.toBigDecimal().setScale(1, RoundingMode.UP).toDouble()} m/s²",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = "Average Variance: ${viewModel.timeBetweenPoints.toBigDecimal().setScale(1, RoundingMode.UP).toDouble()} m/s³",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Text(
+                    text = "Barometer",
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Text(
+                    text = "Pressure: ${viewModel.pressure.toInt()} kPa",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = "Altitude: x m",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun SimulationSensorsCard(
+    onSensorSelectionChange: (Set<String>) -> Unit,
+    selectedSensors: Set<String>
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp),
+        shape = RoundedCornerShape(12.dp),
+        elevation = CardDefaults.cardElevation(8.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            // Title
+            Text(
+                text = "Simulation Sensors",
+                style = MaterialTheme.typography.bodyLarge,
+                modifier = Modifier.padding(bottom = 16.dp)
+            )
+
+            // Sensor buttons
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                // Accelerometer Button
+                SensorButton(
+                    label = "Accelerometer",
+                    icon = ImageVector.vectorResource(id = R.drawable.accelerometer),
+                    isSelected = selectedSensors.contains("Accelerometer"),
+                    onClick = {
+                        val updatedSelection = if (selectedSensors.contains("Accelerometer")) {
+                            selectedSensors - "Accelerometer"
+                        } else {
+                            selectedSensors + "Accelerometer"
+                        }
+                        onSensorSelectionChange(updatedSelection)
+                    }
+                )
+
+                // Barometer Button
+                SensorButton(
+                    label = "Barometer",
+                    icon = ImageVector.vectorResource(id = R.drawable.barometer),
+                    isSelected = selectedSensors.contains("Barometer"),
+                    onClick = {
+                        val updatedSelection = if (selectedSensors.contains("Barometer")) {
+                            selectedSensors - "Barometer"
+                        } else {
+                            selectedSensors + "Barometer"
+                        }
+                        onSensorSelectionChange(updatedSelection)
+                    }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun SensorButton(label: String, icon: ImageVector, isSelected: Boolean, onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        colors = ButtonDefaults.buttonColors(
+            containerColor = if (isSelected) MaterialTheme.colorScheme.secondary else MaterialTheme.colorScheme.surface,
+            contentColor = if (isSelected) MaterialTheme.colorScheme.onSecondary else MaterialTheme.colorScheme.onSurface
+        ),
+        shape = RoundedCornerShape(12.dp),
+        elevation = ButtonDefaults.buttonElevation(0.dp, 4.dp),
+        modifier = Modifier
+            .padding(horizontal = 8.dp)
+    ) {
+        Column(
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                modifier = Modifier.size(24.dp)
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.bodyMedium
+            )
         }
     }
 }
@@ -222,6 +495,7 @@ fun MultiFilePicker(viewModel: SimulationViewModel) {
                     interpolateBarometerData(barometerData!!, accelerometerTimestamps)
                 dataStreams[CSVDataLoader.DataType.ACCELEROMETER]?.add(accelerometerData!!)
                 dataStreams[CSVDataLoader.DataType.BAROMETER]?.add(interpolatedBarometerData)
+                finalTimestamp = accelerometerTimestamps.last()
                 viewModel.setSimulatedData(dataStreams)
             } else {
                 Log.e("SimulatorActivity", "Both files must be selected to proceed")
@@ -246,7 +520,7 @@ fun MultiFilePicker(viewModel: SimulationViewModel) {
     }
 
     Button(onClick = { shouldLaunchPicker = true }) {
-        Text("Pick Multiple Files")
+        Text("Select Flight Files")
     }
 }
 
