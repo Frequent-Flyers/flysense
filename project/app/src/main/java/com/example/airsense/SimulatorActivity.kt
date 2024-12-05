@@ -55,6 +55,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.vectorResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.airsense.detector.algorithm.FlightDetectionAlgorithm
@@ -154,7 +155,6 @@ class SimulatorActivity : ComponentActivity() {
                                 .padding(bottom = paddingValues.calculateBottomPadding())
                                 .verticalScroll(rememberScrollState())
                         ) {
-                            // DisplaySensorValues(simulationViewModel)
 
                             val elapsedTime = (simulationViewModel.accelCurrentTimestamp - simulationViewModel.accelFirstTimestamp) / 1000000000
 
@@ -318,6 +318,7 @@ fun SimulationProgressCard(
                 Text(
                     text = "Accelerometer",
                     style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Spacer(modifier = Modifier.height(8.dp))
@@ -337,6 +338,7 @@ fun SimulationProgressCard(
                 Text(
                     text = "Barometer",
                     style = MaterialTheme.typography.bodyLarge,
+                    fontWeight = FontWeight.Bold,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Spacer(modifier = Modifier.height(8.dp))
@@ -481,16 +483,28 @@ fun FlightStageCard(
                             .padding(8.dp),
                         tint = MaterialTheme.colorScheme.onPrimary
                     )
-                    Spacer(modifier = Modifier.width(16.dp))
-                    Text(
-                        text = if (stage in stageDetectionTimes) {
-                            "${stageDisplayNames[stage] ?: stage} (${stageDetectionTimes[stage]} elapsed)"
-                        } else {
-                            "${stageDisplayNames[stage] ?: stage} not Detected"
-                        },
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = if (stage in stageDetectionTimes) MaterialTheme.colorScheme.primary else Color.Gray
-                    )
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.End
+                    ) {
+                        Text(
+                            text = stageDisplayNames[stage] ?: stage,
+                            style = MaterialTheme.typography.bodyLarge,
+                            fontWeight = FontWeight.Bold,
+                            color = if (stage in stageDetectionTimes) MaterialTheme.colorScheme.primary else Color.Gray
+                        )
+
+                        Text(
+                            text = if (stage in stageDetectionTimes) {
+                                "${stageDetectionTimes[stage]} elapsed"
+                            } else {
+                                "Not Detected"
+                            },
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = if (stage in stageDetectionTimes) MaterialTheme.colorScheme.primary else Color.Gray
+                        )
+                    }
+
                 }
             }
 
