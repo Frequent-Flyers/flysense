@@ -28,14 +28,10 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.outlined.Home
-import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Button
@@ -61,12 +57,17 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.airsense.detector.algorithm.FlightDetectionAlgorithm
+import com.example.airsense.detector.algorithm.FlightState
 import com.example.airsense.ui.theme.AirsenseTheme
 import dagger.hilt.android.AndroidEntryPoint
 import java.math.RoundingMode
 import java.util.Locale
+import javax.inject.Inject
+import kotlin.math.pow
 
 var finalTimestamp = 0L
+var stageDetectionTimes = mutableMapOf<String, String>()
 
 data class BottomNavigationItem(
     val title: String,
@@ -77,6 +78,7 @@ data class BottomNavigationItem(
 @AndroidEntryPoint
 class SimulatorActivity : ComponentActivity() {
     private lateinit var simulationViewModel: SimulationViewModel
+    private lateinit var flightDetectionAlgorithm: FlightDetectionAlgorithm
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -86,8 +88,15 @@ class SimulatorActivity : ComponentActivity() {
         setContent {
             AirsenseTheme {
                 simulationViewModel = viewModel<SimulationViewModel>()
+                flightDetectionAlgorithm = simulationViewModel.flightDetectionAlgorithm
                 var selectedItemIndex by remember { mutableIntStateOf(1) }
                 var selectedSensor by remember { mutableStateOf(setOf<String>()) }
+                var flightState by remember { mutableStateOf(FlightState.GROUNDED) }
+
+                flightDetectionAlgorithm.listener = { newFlightState ->
+                    Log.d("SimulatorActivity", "[SIMULATOR] New flight state: $newFlightState")
+                    flightState = newFlightState
+                }
 
                 val items = listOf(
                     BottomNavigationItem(
@@ -139,7 +148,6 @@ class SimulatorActivity : ComponentActivity() {
                     }
                 ) { paddingValues ->
                     Box(modifier = Modifier.fillMaxSize()) {
-                        // Scrollable content
                         Column(
                             modifier = Modifier
                                 .fillMaxSize()
@@ -148,12 +156,27 @@ class SimulatorActivity : ComponentActivity() {
                         ) {
                             // DisplaySensorValues(simulationViewModel)
 
+                            val elapsedTime = (simulationViewModel.accelCurrentTimestamp - simulationViewModel.accelFirstTimestamp) / 1000000000
+
                             if (simulationViewModel.accelFirstTimestamp != 0L) {
                                 SimulationProgressCard(viewModel = simulationViewModel)
+                                FlightStageCard(
+                                    currentStage = flightState.toString(),
+                                    elapsedSimulationTime = String.format(
+                                        Locale.getDefault(),
+                                        "%02d:%02d:%02d",
+                                        elapsedTime / 3600,
+                                        (elapsedTime % 3600) / 60,
+                                        elapsedTime % 60
+                                    ),
+                                    stageDetectionTimes = stageDetectionTimes,
+                                    onEndSimulationClick = {
+
+                                    }
+                                )
                             }
                         }
 
-                        // MultiFilePicker at the bottom
                         if (simulationViewModel.accelFirstTimestamp == 0L) {
                             Box(
                                 modifier = Modifier
@@ -225,6 +248,11 @@ fun SimulationProgressCard(
 
     val progress = (elapsed.toDouble() / totalDuration.toDouble() * 100).toInt()
     val progressColor = Color(0xFF9a78d1)
+
+
+    val seaLevelPressure = 1013.25 // hPa
+    val estimatedCabinAltitudeMeters = 44330 * (1 - (viewModel.pressure / seaLevelPressure).pow(1 / 5.255))
+    val estimatedCabinAltitudeFeet = estimatedCabinAltitudeMeters * 3.28084
 
     Card(
         modifier = Modifier
@@ -313,12 +341,12 @@ fun SimulationProgressCard(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 Text(
-                    text = "Pressure: ${viewModel.pressure.toInt()} kPa",
+                    text = "Pressure: ${viewModel.pressure.toInt()} hPa",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
                 Text(
-                    text = "Altitude: x m",
+                    text = "Cabin Altitude: ${estimatedCabinAltitudeMeters.toInt()} m (${estimatedCabinAltitudeFeet.toInt()} ft)",
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -386,6 +414,97 @@ fun SimulationSensorsCard(
                         onSensorSelectionChange(updatedSelection)
                     }
                 )
+            }
+        }
+    }
+}
+
+@Composable
+fun FlightStageCard(
+    currentStage: String,
+    stageDetectionTimes: MutableMap<String, String>,
+    elapsedSimulationTime: String,
+    onEndSimulationClick: () -> Unit
+) {
+    val stageIcons = listOf(
+        R.drawable.takeoff to "CLIMBING", // Takeoff
+        R.drawable.cruising to "CRUISING", // Cruise
+        R.drawable.landing to "DESCENDING", // Descent
+        R.drawable.grounded to "GROUNDED" // Landing
+    )
+
+    val stageDisplayNames = mapOf(
+        "CLIMBING" to "Takeoff",
+        "CRUISING" to "Cruise",
+        "DESCENDING" to "Descent",
+        "GROUNDED" to "Landing"
+    )
+
+    var hasTakenOff by remember { mutableStateOf(false) }
+
+    if (currentStage == "CLIMBING" || currentStage == "CRUISING" || currentStage == "LANDING") {
+        hasTakenOff = true
+    }
+
+    if (currentStage !in stageDetectionTimes && (currentStage != "GROUNDED" || hasTakenOff)) {
+        stageDetectionTimes[currentStage] = elapsedSimulationTime
+    }
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(16.dp)
+            .clip(RoundedCornerShape(12.dp)),
+        elevation = CardDefaults.cardElevation(8.dp)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp)
+        ) {
+            stageIcons.forEach { (iconRes, stage) ->
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = ImageVector.vectorResource(id = iconRes),
+                        contentDescription = stage,
+                        modifier = Modifier
+                            .size(32.dp)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(
+                                if (stage in stageDetectionTimes) MaterialTheme.colorScheme.primary else Color.Gray
+                            )
+                            .padding(8.dp),
+                        tint = MaterialTheme.colorScheme.onPrimary
+                    )
+                    Spacer(modifier = Modifier.width(16.dp))
+                    Text(
+                        text = if (stage in stageDetectionTimes) {
+                            "${stageDisplayNames[stage] ?: stage} (${stageDetectionTimes[stage]} elapsed)"
+                        } else {
+                            "${stageDisplayNames[stage] ?: stage} not Detected"
+                        },
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = if (stage in stageDetectionTimes) MaterialTheme.colorScheme.primary else Color.Gray
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Button(
+                onClick = onEndSimulationClick,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error,
+                    contentColor = MaterialTheme.colorScheme.onError
+                ),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("End Simulation")
             }
         }
     }
@@ -568,7 +687,7 @@ fun DisplaySensorValues(viewModel: SimulationViewModel) {
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = "Pressure: ${viewModel.pressure}\n" +
+                text = "Recorded Pressure: ${viewModel.pressure}\n" +
                         "Time elapsed ${(viewModel.baroCurrentTimestamp - viewModel.baroFirstTimestamp) / 1000000000}\n",
             )
         }

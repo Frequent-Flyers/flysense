@@ -11,6 +11,15 @@ class FlightDetectionAlgorithm {
     private var latestPressures = mutableListOf<Double>()
     private var frequency = 100
 
+    var listener: ((FlightState) -> Unit)? = null
+
+    private fun updateState() {
+        if (flightState != lastFlightState) {
+            Log.d("FlightDetectionAlgorithm", "[ALGORITHM] Flight state updated to $flightState.")
+            listener?.invoke(flightState)
+        }
+    }
+
     fun reset() {
         lastFlightState = FlightState.GROUNDED
         flightStartTime = 0.0
@@ -66,14 +75,16 @@ class FlightDetectionAlgorithm {
             interpolatedBarometerData
         )
 
+        updateState()
+
         if (flightState != lastFlightState) {
             if (flightState == FlightState.CLIMBING) {
                 //we have started flying
                 flightStartTime = timestamps.last()
-                Log.d("FlightDetectionAlgorithm", "Flight detected, started at $flightStartTime")
+                Log.d("FlightDetectionAlgorithm", "[ALGORITHM] Flight detected. It started at $flightStartTime.")
             } else if (flightState == FlightState.GROUNDED) {
                 val flightDuration = timestamps.last() - flightStartTime
-                Log.d("FlightDetectionAlgorithm", "Flight ended. Duration: $flightDuration seconds")
+                Log.d("FlightDetectionAlgorithm", "[ALGORITHM] Flight ended. It lasted $flightDuration seconds.")
             }
             lastFlightState = flightState
         }
@@ -104,13 +115,13 @@ class FlightDetectionAlgorithm {
         if (flightState == FlightState.CLIMBING) {
             //first lets check if we are climbing
             if (isCruising(barometerData)) {
-                Log.d("FlightDetectionAlgorithm", "Cruising detected")
+                Log.d("FlightDetectionAlgorithm", "[ALGORITHM] Cruising detected.")
                 return FlightState.CRUISING
             }
             return FlightState.CLIMBING
         } else if (flightState == FlightState.CRUISING) {
             if (isDescending(barometerData)) {
-                Log.d("FlightDetectionAlgorithm", "Descending detected")
+                Log.d("FlightDetectionAlgorithm", "[ALGORITHM] Descending detected.")
                 return FlightState.DESCENDING
             }
             return FlightState.CRUISING
@@ -204,7 +215,7 @@ class FlightDetectionAlgorithm {
                                     }
                                     println("max variance accel: ${varianceAcceleration.max()}")
                                     if (!highVarianceFound) {
-                                        Log.d("FlightDetectionAlgorithm", "Takeoff detected")
+                                        Log.d("FlightDetectionAlgorithm", "[ALGORITHM] Takeoff detected.")
                                         latestPressures.clear()
                                         return FlightState.CLIMBING // Takeoff detected
                                     } else {
