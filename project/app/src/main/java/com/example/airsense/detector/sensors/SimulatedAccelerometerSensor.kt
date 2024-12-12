@@ -41,6 +41,7 @@ class SimulatedAccelerometerSensor(
 
     override fun stopListening() {
         sensorJob?.cancel() // Stop the sensor job when the fake sensor is stopped
+        onSensorValuesChanged = null // Remove the listener
         sensorData = emptyList()
     }
 

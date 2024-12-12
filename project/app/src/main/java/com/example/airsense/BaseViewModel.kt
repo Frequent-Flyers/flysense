@@ -19,6 +19,20 @@ open class BaseViewModel : ViewModel() {
     var yaw by mutableStateOf(0f)
     var pressure by mutableStateOf(0f)
 
+    fun resetVariables() {
+        absoluteAcceleration = 0f
+        accelCurrentTimestamp = 0L
+        lastTimestamp = 0L
+        accelFirstTimestamp = 0L
+        baroFirstTimestamp = 0L
+        baroCurrentTimestamp = 0L
+        timeBetweenPoints = 0L
+        pitch = 0f
+        roll = 0f
+        yaw = 0f
+        pressure = 0f
+    }
+
     // Shared flight detection algorithm
 //    protected val flightDetectionAlgorithm = FlightDetectionAlgorithm()
 }

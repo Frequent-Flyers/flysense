@@ -6,7 +6,7 @@ class FlightDetectionAlgorithm {
     private var lastFlightState = FlightState.GROUNDED
     private var flightStartTime = 0.0
     private var counter = 0
-    private var flightState = FlightState.GROUNDED
+    var flightState = FlightState.GROUNDED
     var firstTimeStamp = 0.0
     private var latestPressures = mutableListOf<Double>()
     private var frequency = 100
@@ -49,7 +49,7 @@ class FlightDetectionAlgorithm {
             val (_, x, y, z) = it
             Math.sqrt(x * x + y * y + z * z)
         }
-        
+
         val smoothedAcceleration =
             movingAverage(absoluteAcceleration, 10 * frequency) //10 seconds moving average
         val varianceAcceleration =
@@ -87,7 +87,7 @@ class FlightDetectionAlgorithm {
     ): FlightState {
         counter++
         //Log.d("FlightDetectionAlgorithm", "Counter: $counter")
-        val takeoffAccelerationThreshold = 0.45..0.8
+        val takeoffAccelerationThreshold = 0.35..0.8
         val takeoffDuration = 25.0 // seconds
         var takeoffStartTime = 0.0
         var inTakeoff = false
@@ -97,6 +97,7 @@ class FlightDetectionAlgorithm {
         var highVarianceFound = false
         var finalTime = 0.0
         var endTime = 0.0
+        var curreentMaxAccel = 0.0
 
         // Convert nanoseconds to seconds for all timestamps
         val timestampsInSeconds = timestamps.map { it / 1_000_000_000.0 }
@@ -135,10 +136,15 @@ class FlightDetectionAlgorithm {
                             inTakeoff = true
                             takeoffStartTime = currentTime
                             currentMaxVariance = 0.0
+                            curreentMaxAccel = 0.0
                         }
 
                         if (varianceAcceleration[i] > currentMaxVariance) {
                             currentMaxVariance = varianceAcceleration[i]
+                        }
+
+                        if (currentAcceleration > curreentMaxAccel) {
+                            curreentMaxAccel = currentAcceleration
                         }
 
                         if ((currentTime - takeoffStartTime) >= takeoffDuration) {
@@ -148,14 +154,16 @@ class FlightDetectionAlgorithm {
                                 validTakeoffSpotFound = true
                                 Log.d(
                                     "TakeoffDetection",
-                                    "Valid takeoff spot found. Time: $takeoffStartTime , Max Variance: $currentMaxVariance"
+                                    "Valid takeoff spot found. Time into recording : ${takeoffStartTime - (firstTimeStamp / 1_000_000_000.0)}, Max Variance: $currentMaxVariance, Max Accel: $curreentMaxAccel"
                                 )
                                 currentMaxVariance = 0.0
+                                curreentMaxAccel = 0.0
                             }
                         }
                     } else {
                         inTakeoff = false
                         currentMaxVariance = 0.0
+                        curreentMaxAccel = 0.0
                     }
                 } else {
 //                Log.d("TakeoffDetection", "Checking for acceleration peak after takeoff spot")
@@ -170,7 +178,7 @@ class FlightDetectionAlgorithm {
 
                     if (currentTime - endTime <= 30) {
                         currentAcceleration = smoothedAcceleration[i]
-                        if (currentAcceleration in 1.5..2.5) {
+                        if (currentAcceleration in 1.5..3.0) {
                             if (peakStartTime == 0.0) {
                                 peakStartTime = currentTime
                                 Log.d(
@@ -193,7 +201,7 @@ class FlightDetectionAlgorithm {
                                     for (j in i until smoothedAcceleration.size) {
                                         //print max variance accel
                                         if (timestampsInSeconds[j] > varianceCheckEndTime) break
-                                        if (varianceAcceleration[j] > 3.5) {
+                                        if (varianceAcceleration[j] > 3) {
                                             highVarianceFound = true
                                             Log.d(
                                                 "TakeoffDetection",
@@ -204,7 +212,10 @@ class FlightDetectionAlgorithm {
                                     }
                                     println("max variance accel: ${varianceAcceleration.max()}")
                                     if (!highVarianceFound) {
-                                        Log.d("FlightDetectionAlgorithm", "Takeoff detected")
+                                        Log.d(
+                                            "FlightDetectionAlgorithm",
+                                            "Takeoff detected at ${finalTime - (firstTimeStamp / 1_000_000_000.0)}"
+                                        )
                                         latestPressures.clear()
                                         return FlightState.CLIMBING // Takeoff detected
                                     } else {
