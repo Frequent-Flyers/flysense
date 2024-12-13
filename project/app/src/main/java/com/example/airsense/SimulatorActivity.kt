@@ -306,6 +306,16 @@ fun SimulationProgressCard(
                     color = MaterialTheme.colorScheme.onPrimary
                 )
             }
+
+            Row(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(16.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+
+            }
         }
 
         Box(

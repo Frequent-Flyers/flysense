@@ -81,10 +81,16 @@ class FlightDetectionAlgorithm {
             if (flightState == FlightState.CLIMBING) {
                 //we have started flying
                 flightStartTime = timestamps.last()
-                Log.d("FlightDetectionAlgorithm", "[ALGORITHM] Flight detected. It started at $flightStartTime.")
+                Log.d(
+                    "FlightDetectionAlgorithm",
+                    "[ALGORITHM] Flight detected. It started at $flightStartTime."
+                )
             } else if (flightState == FlightState.GROUNDED) {
                 val flightDuration = timestamps.last() - flightStartTime
-                Log.d("FlightDetectionAlgorithm", "[ALGORITHM] Flight ended. It lasted $flightDuration seconds.")
+                Log.d(
+                    "FlightDetectionAlgorithm",
+                    "[ALGORITHM] Flight ended. It lasted $flightDuration seconds."
+                )
             }
             lastFlightState = flightState
         }
@@ -98,7 +104,7 @@ class FlightDetectionAlgorithm {
     ): FlightState {
         counter++
         //Log.d("FlightDetectionAlgorithm", "Counter: $counter")
-        val takeoffAccelerationThreshold = 0.45..0.8
+        val takeoffAccelerationThreshold = 0.35..0.8
         val takeoffDuration = 25.0 // seconds
         var takeoffStartTime = 0.0
         var inTakeoff = false
@@ -223,7 +229,10 @@ class FlightDetectionAlgorithm {
                                     }
                                     println("max variance accel: ${varianceAcceleration.max()}")
                                     if (!highVarianceFound) {
-                                        Log.d("FlightDetectionAlgorithm", "[ALGORITHM] Takeoff detected.")
+                                        Log.d(
+                                            "FlightDetectionAlgorithm",
+                                            "[ALGORITHM] Takeoff detected."
+                                        )
                                         Log.d(
                                             "FlightDetectionAlgorithm",
                                             "The takeoff time was ${finalTime - (firstTimeStamp / 1_000_000_000.0)}."
