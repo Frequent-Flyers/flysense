@@ -4,6 +4,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.plus
 
 open class BaseViewModel : ViewModel() {
     // Base view model logic goes here
@@ -32,6 +36,8 @@ open class BaseViewModel : ViewModel() {
         yaw = 0f
         pressure = 0f
     }
+
+    protected val coroutineScope: CoroutineScope = viewModelScope + Dispatchers.Main
 
     // Shared flight detection algorithm
 //    protected val flightDetectionAlgorithm = FlightDetectionAlgorithm()

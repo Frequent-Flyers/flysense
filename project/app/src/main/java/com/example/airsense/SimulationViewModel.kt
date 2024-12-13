@@ -16,7 +16,7 @@ class SimulationViewModel @Inject constructor(
     @Named("simulatedBarometerSensor") private var simulatedBarometerSensor: MeasurableSensor
 ) : BaseViewModel() {
     var timeElapsed = 0L
-    private val flightDetectionAlgorithm = FlightDetectionAlgorithm()
+    val flightDetectionAlgorithm = FlightDetectionAlgorithm()
     private val defaultBatchSize = 7000
     private val defaultCarryOver = 4000
     private var flying = false
