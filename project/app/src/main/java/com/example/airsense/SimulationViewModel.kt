@@ -2,6 +2,7 @@ package com.example.airsense
 
 import android.util.Log
 import com.example.airsense.detector.algorithm.FlightDetectionAlgorithm
+import com.example.airsense.detector.algorithm.FlightState
 import com.example.airsense.detector.sensors.MeasurableSensor
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
@@ -18,6 +19,7 @@ class SimulationViewModel @Inject constructor(
     private val flightDetectionAlgorithm = FlightDetectionAlgorithm()
     private val defaultBatchSize = 7000
     private val defaultCarryOver = 4000
+    private var flying = false
 
     private var _frequency = 0.0
     var frequency: Double
@@ -34,6 +36,13 @@ class SimulationViewModel @Inject constructor(
     init {
         // Start simulated sensors and use shared methods from BaseViewModel
         flightDetectionAlgorithm.reset()
+        startSimulatedSensors()
+    }
+
+    fun clearFromPreviousRuns() {
+        resetVariables()
+        flightDetectionAlgorithm.reset()
+        flying = false
         startSimulatedSensors()
     }
 
@@ -136,6 +145,14 @@ class SimulationViewModel @Inject constructor(
         barometerData: List<List<Double>>
     ) {
         flightDetectionAlgorithm.processData(accelerometerData, barometerData)
+        if (flightDetectionAlgorithm.flightState == FlightState.CLIMBING) {
+            flying = true
+        }
+        if (flying && flightDetectionAlgorithm.flightState == FlightState.GROUNDED) {
+            flying = false
+            stopSimulatedSensors()
+            Log.d("SimulationViewModel", "Flight ended.")
+        }
     }
 
     private fun <T> removeOldestData(queue: ArrayDeque<T>, removeCount: Int) {

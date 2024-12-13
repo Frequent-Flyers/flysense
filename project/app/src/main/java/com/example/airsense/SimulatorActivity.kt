@@ -134,6 +134,7 @@ fun MultiFilePicker(viewModel: SimulationViewModel) {
                     interpolateBarometerData(barometerData!!, accelerometerTimestamps)
                 dataStreams[CSVDataLoader.DataType.ACCELEROMETER]?.add(accelerometerData!!)
                 dataStreams[CSVDataLoader.DataType.BAROMETER]?.add(interpolatedBarometerData)
+                viewModel.clearFromPreviousRuns()
                 viewModel.setSimulatedData(dataStreams)
             } else {
                 Log.e("SimulatorActivity", "Both files must be selected to proceed")
