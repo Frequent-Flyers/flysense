@@ -468,8 +468,12 @@ fun FlightStageCard(
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                        .padding(vertical = 8.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(
+                            if (stage in stageDetectionTimes) Color.White.copy(alpha = 0.3f) else Color.White.copy(alpha = 0.15f))
+                        .padding(8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Icon(
                         imageVector = ImageVector.vectorResource(id = iconRes),
