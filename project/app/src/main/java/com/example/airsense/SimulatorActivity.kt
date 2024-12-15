@@ -1,6 +1,7 @@
 package com.example.airsense
 
 import android.content.ContentResolver
+import android.content.Intent
 import android.database.Cursor
 import android.net.Uri
 import android.os.Build
@@ -39,6 +40,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
+import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
@@ -58,23 +60,62 @@ import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.airsense.components.AppTopBar
 import com.example.airsense.detector.algorithm.FlightDetectionAlgorithm
 import com.example.airsense.detector.algorithm.FlightState
-import com.example.airsense.ui.theme.AirsenseTheme
+import com.example.compose.AirSenseTheme
 import dagger.hilt.android.AndroidEntryPoint
 import java.math.RoundingMode
+import java.time.Duration
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
 import java.util.Locale
 import javax.inject.Inject
 import kotlin.math.pow
 
 var finalTimestamp = 0L
-var stageDetectionTimes = mutableMapOf<String, String>()
 
 data class BottomNavigationItem(
     val title: String,
     val selectedIcon: ImageVector,
     val unselectedIcon: ImageVector
 )
+
+/**
+ * Manages the flight stages and their detection times
+ * @property stageDetectionTimes A map of flight stages and their detection times
+ * @property hasTakenOff A flag indicating whether the aircraft has taken off
+ */
+object FlightStageManager {
+    private val _stageDetectionTimes = mutableStateOf<Map<String, String>>(emptyMap())
+    val stageDetectionTimes: Map<String, String> get() = _stageDetectionTimes.value
+
+    var hasTakenOff = false
+        private set
+
+    /**
+     * Update the stage detection times
+     * @param currentStage The current stage
+     * @param elapsedSimulationTime The elapsed simulation time
+     */
+    fun updateStage(currentStage: String, elapsedSimulationTime: String) {
+        if (currentStage == "CLIMBING" || currentStage == "CRUISING" || currentStage == "DESCENDING") {
+            hasTakenOff = true
+        }
+
+        if (currentStage == "GROUNDED" && !hasTakenOff) {
+            return
+        }
+
+        if (currentStage !in stageDetectionTimes) {
+            _stageDetectionTimes.value = stageDetectionTimes + (currentStage to elapsedSimulationTime)
+        }
+
+        if (currentStage == "GROUNDED" && hasTakenOff) {
+            _stageDetectionTimes.value = stageDetectionTimes + ("GROUNDED" to elapsedSimulationTime)
+        }
+    }
+}
 
 @AndroidEntryPoint
 class SimulatorActivity : ComponentActivity() {
@@ -87,7 +128,7 @@ class SimulatorActivity : ComponentActivity() {
         setImmersiveMode()
 
         setContent {
-            AirsenseTheme {
+            AirSenseTheme {
                 simulationViewModel = viewModel<SimulationViewModel>()
                 flightDetectionAlgorithm = simulationViewModel.flightDetectionAlgorithm
                 var selectedItemIndex by remember { mutableIntStateOf(1) }
@@ -99,54 +140,22 @@ class SimulatorActivity : ComponentActivity() {
                     flightState = newFlightState
                 }
 
-                val items = listOf(
-                    BottomNavigationItem(
-                        title = "Fly",
-                        selectedIcon = ImageVector.vectorResource(id = R.drawable.fly),
-                        unselectedIcon = ImageVector.vectorResource(id = R.drawable.fly),
-                    ),
-                    BottomNavigationItem(
-                        title = "Simulate",
-                        selectedIcon = ImageVector.vectorResource(id = R.drawable.simulate),
-                        unselectedIcon = ImageVector.vectorResource(id = R.drawable.simulate),
-                    ),
-                    BottomNavigationItem(
-                        title = "Settings",
-                        selectedIcon = ImageVector.vectorResource(id = R.drawable.settings),
-                        unselectedIcon = ImageVector.vectorResource(id = R.drawable.settings),
-                    )
-                )
-
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
                     bottomBar = {
-                        NavigationBar {
-                            items.forEachIndexed { index, item ->
-                                NavigationBarItem(
-                                    selected = selectedItemIndex == index,
-                                    onClick = {
-                                        if (index == 0) {
-                                            finish()
-                                        } else if (index == 1) {
-                                            selectedItemIndex = index
-                                        } else if (index == 2) {
-                                            Log.d("SimulatorActivity", "Settings clicked")
-                                        }
-                                    },
-                                    icon = {
-                                        Icon(
-                                            imageVector = if (selectedItemIndex == index) item.selectedIcon else item.unselectedIcon,
-                                            contentDescription = item.title,
-                                            modifier = Modifier.size(32.dp)
-                                        )
-                                    },
-                                    label = {
-                                        Text(text = item.title)
-                                    }
-                                )
+                        BottomNavBar(
+                            selectedItemIndex = selectedItemIndex,
+                            onItemSelected = { index ->
+                                if (index == 0) {
+                                    val intent = Intent(this, MainActivity::class.java)
+                                    startActivity(intent)
+                                }
+                                if (index == 1) finish()
+                                if (index == 2) Log.d("SimulatorActivity", "Settings clicked")
                             }
-                        }
+                        )
                     }
+
                 ) { paddingValues ->
                     Box(modifier = Modifier.fillMaxSize()) {
                         Column(
@@ -169,7 +178,6 @@ class SimulatorActivity : ComponentActivity() {
                                         (elapsedTime % 3600) / 60,
                                         elapsedTime % 60
                                     ),
-                                    stageDetectionTimes = stageDetectionTimes,
                                     onEndSimulationClick = {
 
                                     }
@@ -230,142 +238,95 @@ class SimulatorActivity : ComponentActivity() {
 }
 
 @Composable
-fun SimulationProgressCard(
-    viewModel: SimulationViewModel
-) {
+fun SimulationProgressCard(viewModel: SimulationViewModel) {
     val elapsed = viewModel.accelCurrentTimestamp - viewModel.accelFirstTimestamp
-    val hours = elapsed / 3600000000000
-    val minutes = (elapsed % 3600000000000) / 60000000000
-    val seconds = (elapsed % 60000000000) / 1000000000
+    val formattedTime = Duration.ofNanos(elapsed).toFormattedString()
+    val progress = calculateProgress(elapsed, finalTimestamp - viewModel.accelFirstTimestamp)
 
-    val totalDuration = finalTimestamp - viewModel.accelFirstTimestamp
+    val stageDetectionTimes = FlightStageManager.stageDetectionTimes
+    val hasEnded = FlightStageManager.hasTakenOff && "GROUNDED" in stageDetectionTimes
 
-    val formattedTime = when {
-        hours > 0 -> String.format(Locale.getDefault(), "%02d:%02d:%02d", hours, minutes, seconds)
-        minutes > 0 -> String.format(Locale.getDefault(), "%02d:%02d", minutes, seconds)
-        else -> String.format(Locale.getDefault(), "00:%02d", seconds)
+    val containerColor = if (hasEnded) {
+        MaterialTheme.colorScheme.primaryContainer
+    } else {
+        MaterialTheme.colorScheme.surfaceVariant
     }
 
-    val progress = (elapsed.toDouble() / totalDuration.toDouble() * 100).toInt()
-    val progressColor = Color(0xFF9a78d1)
-
-
-    val seaLevelPressure = 1013.25 // hPa
-    val estimatedCabinAltitudeMeters = 44330 * (1 - (viewModel.pressure / seaLevelPressure).pow(1 / 5.255))
-    val estimatedCabinAltitudeFeet = estimatedCabinAltitudeMeters * 3.28084
+    val textColor = if (hasEnded) {
+        MaterialTheme.colorScheme.onPrimaryContainer
+    } else {
+        MaterialTheme.colorScheme.onSurfaceVariant
+    }
 
     Card(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(16.dp)
-            .clip(RoundedCornerShape(12.dp))
+            .padding(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = containerColor,
+            contentColor = textColor
+        )
     ) {
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-                .height(100.dp)
-                .clip(RoundedCornerShape(12.dp))
-        ) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(MaterialTheme.colorScheme.primary)
-            )
-
-            Box(
-                modifier = Modifier
-                    .fillMaxHeight()
-                    .fillMaxWidth(progress / 100f)
-                    .background(progressColor)
-            )
-
+        Column(modifier = Modifier.padding(16.dp)) {
             Row(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
+                Text(
+                    text = if (hasEnded) "Flight Ended" else "Simulation Progress",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = textColor
+                )
+                if (hasEnded) {
                     Text(
-                        text = "Simulation Progress",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onPrimary
-                    )
-                    Text(
-                        text = formattedTime,
+                        text = "Duration: ${
+                            calculateDuration(
+                                stageDetectionTimes["CLIMBING"] ?: "00:00:00",
+                                stageDetectionTimes["GROUNDED"] ?: "00:00:00"
+                            )
+                        }",
                         style = MaterialTheme.typography.bodyMedium,
-                        color = MaterialTheme.colorScheme.onPrimary
+                        color = textColor
                     )
                 }
-
-                Text(
-                    text = "${progress}%",
-                    style = MaterialTheme.typography.headlineMedium,
-                    color = MaterialTheme.colorScheme.onPrimary
-                )
             }
 
-            Row(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(16.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
+            Spacer(modifier = Modifier.height(8.dp))
 
-            }
-        }
-
-        Box(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp)
-                .clip(RoundedCornerShape(12.dp))
-        ) {
-            Column {
-                Text(
-                    text = "Accelerometer",
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
+            // Progress Indicator or Static Box for Ended State
+            if (!hasEnded) {
+                LinearProgressIndicator(
+                    progress = { progress },
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(8.dp),
+                    color = MaterialTheme.colorScheme.primary,
+                    trackColor = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.1f),
                 )
+
                 Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "Acceleration: ${viewModel.absoluteAcceleration.toBigDecimal().setScale(1, RoundingMode.UP).toDouble()} m/s²",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = "Average Variance: ${viewModel.timeBetweenPoints.toBigDecimal().setScale(1, RoundingMode.UP).toDouble()} m/s³",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
 
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Text(
-                    text = "Barometer",
-                    style = MaterialTheme.typography.bodyLarge,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onSurface
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                Text(
-                    text = "Pressure: ${viewModel.pressure.toInt()} hPa",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-                Text(
-                    text = "Cabin Altitude: ${estimatedCabinAltitudeMeters.toInt()} m (${estimatedCabinAltitudeFeet.toInt()} ft)",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = formattedTime,
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = textColor
+                    )
+                    Text(
+                        text = "${(progress * 100).toInt()}%",
+                        style = MaterialTheme.typography.bodyLarge,
+                        color = MaterialTheme.colorScheme.primary
+                    )
+                }
             }
         }
     }
 }
+
 
 @Composable
 fun SimulationSensorsCard(
@@ -434,10 +395,12 @@ fun SimulationSensorsCard(
 @Composable
 fun FlightStageCard(
     currentStage: String,
-    stageDetectionTimes: MutableMap<String, String>,
     elapsedSimulationTime: String,
     onEndSimulationClick: () -> Unit
 ) {
+    // Update the flight stage globally
+    FlightStageManager.updateStage(currentStage, elapsedSimulationTime)
+
     val stageIcons = listOf(
         R.drawable.takeoff to "CLIMBING", // Takeoff
         R.drawable.cruising to "CRUISING", // Cruise
@@ -452,15 +415,7 @@ fun FlightStageCard(
         "GROUNDED" to "Landing"
     )
 
-    var hasTakenOff by remember { mutableStateOf(false) }
-
-    if (currentStage == "CLIMBING" || currentStage == "CRUISING" || currentStage == "LANDING") {
-        hasTakenOff = true
-    }
-
-    if (currentStage !in stageDetectionTimes && (currentStage != "GROUNDED" || hasTakenOff)) {
-        stageDetectionTimes[currentStage] = elapsedSimulationTime
-    }
+    val stageDetectionTimes = FlightStageManager.stageDetectionTimes
 
     Card(
         modifier = Modifier
@@ -481,7 +436,9 @@ fun FlightStageCard(
                         .padding(vertical = 8.dp)
                         .clip(RoundedCornerShape(12.dp))
                         .background(
-                            if (stage in stageDetectionTimes) Color.White.copy(alpha = 0.3f) else Color.White.copy(alpha = 0.15f))
+                            if (stage in stageDetectionTimes) Color.White.copy(alpha = 0.3f)
+                            else Color.White.copy(alpha = 0.15f)
+                        )
                         .padding(8.dp),
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
@@ -492,7 +449,7 @@ fun FlightStageCard(
                             .size(32.dp)
                             .clip(RoundedCornerShape(8.dp))
                             .background(
-                                if (stage in stageDetectionTimes) MaterialTheme.colorScheme.primary else Color.Gray
+                                if (stage in stageDetectionTimes) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.outline
                             )
                             .padding(8.dp),
                         tint = MaterialTheme.colorScheme.onPrimary
@@ -505,7 +462,7 @@ fun FlightStageCard(
                             text = stageDisplayNames[stage] ?: stage,
                             style = MaterialTheme.typography.bodyLarge,
                             fontWeight = FontWeight.Bold,
-                            color = if (stage in stageDetectionTimes) MaterialTheme.colorScheme.primary else Color.Gray
+                            color = if (stage in stageDetectionTimes) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.outline
                         )
 
                         Text(
@@ -515,10 +472,9 @@ fun FlightStageCard(
                                 "Not Detected"
                             },
                             style = MaterialTheme.typography.bodyLarge,
-                            color = if (stage in stageDetectionTimes) MaterialTheme.colorScheme.primary else Color.Gray
+                            color = if (stage in stageDetectionTimes) MaterialTheme.colorScheme.onSurfaceVariant else MaterialTheme.colorScheme.outline
                         )
                     }
-
                 }
             }
 
@@ -537,6 +493,7 @@ fun FlightStageCard(
         }
     }
 }
+
 
 @Composable
 fun SensorButton(label: String, icon: ImageVector, isSelected: Boolean, onClick: () -> Unit) {
@@ -768,4 +725,31 @@ private fun findNearestIndices(
     }
 }
 
+fun calculateDuration(startTime: String, endTime: String): String {
+    val formatter = DateTimeFormatter.ofPattern("HH:mm:ss")
 
+    val start = LocalTime.parse(startTime, formatter)
+    val end = LocalTime.parse(endTime, formatter)
+
+    val duration = Duration.between(start, end)
+
+    val hours = duration.toHours()
+    val minutes = duration.toMinutes() % 60
+    val seconds = duration.seconds % 60
+
+    // Format and return the result
+    return String.format(Locale.getDefault(),"%02d:%02d:%02d", hours, minutes, seconds)
+}
+
+fun calculateProgress(elapsed: Long, totalDuration: Long): Float {
+    if (totalDuration <= 0) return 0f
+    return (elapsed.toFloat() / totalDuration.toFloat()).coerceIn(0f, 1f)
+}
+
+fun Duration.toFormattedString(): String {
+    val hours = this.toHours()
+    val minutes = this.toMinutes() % 60
+    val seconds = this.seconds % 60
+
+    return String.format("%02d:%02d:%02d", hours, minutes, seconds)
+}
