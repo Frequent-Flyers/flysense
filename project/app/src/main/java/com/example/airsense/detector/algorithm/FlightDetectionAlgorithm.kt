@@ -10,6 +10,8 @@ class FlightDetectionAlgorithm {
     var firstTimeStamp = 0.0
     private var latestPressures = mutableListOf<Double>()
     private var frequency = 100
+    private var landingAccel = false
+    private var landingBaroFlatten = false
 
     var listener: ((FlightState) -> Unit)? = null
 
@@ -127,21 +129,43 @@ class FlightDetectionAlgorithm {
             }
             return FlightState.CLIMBING
         } else if (flightState == FlightState.CRUISING) {
+            if (isAscending(barometerData)) {
+                Log.d("FlightDetectionAlgorithm", "[ALGORITHM] Ascending detected.")
+                return FlightState.CLIMBING
+            }
             if (isDescending(barometerData)) {
                 Log.d("FlightDetectionAlgorithm", "[ALGORITHM] Descending detected.")
                 return FlightState.DESCENDING
             }
             return FlightState.CRUISING
         } else if (flightState == FlightState.DESCENDING) {
+            // can happen before accel hits
+//            if (!landingAccel && isCruising(barometerData)) {
+//                Log.d("FlightDetectionAlgorithm", "[ALGORITHM] Cruising detected.")
+//                return FlightState.CRUISING
+//            }
             //we are approaching the ground
             for (i in smoothedAcceleration.indices) {
                 val currentAcceleration = smoothedAcceleration[i]
                 if (currentAcceleration > 4.0) {
-                    Log.d("FlightDetectionAlgorithm", "Possible landing")
-                    println("time of possible landing: ${timestampsInSeconds[i]}")
-                    return FlightState.GROUNDED
+                    landingAccel = true
+                    println("acceleration for landing hit. ")
+//                    Log.d("FlightDetectionAlgorithm", "Possible landing")
+//                    println("time of possible landing: ${timestampsInSeconds[i]}")
+//                    return FlightState.GROUNDED
                 }
             }
+
+            if (isCruising(barometerData)) {
+                landingBaroFlatten = true
+                println("barometer for landing hit. ")
+            }
+            if (landingAccel && landingBaroFlatten) {
+                Log.d("FlightDetectionAlgorithm", "[ALGORITHM] Landed.")
+                println("time of possible landing approx: ${timestampsInSeconds.last() - (firstTimeStamp / 1_000_000_000.0)}")
+                return FlightState.GROUNDED
+            }
+//            println("is cruising?: ${isCruising(barometerData)}")
             return FlightState.DESCENDING
         } else {
             for (i in smoothedAcceleration.indices) {
@@ -287,13 +311,29 @@ class FlightDetectionAlgorithm {
     }
 
     fun isDescending(list: List<Double>): Boolean {
-//        println("descending list: $list")
+        var nonDescendingCount = 0
+        val tolerance = 50
+
         for (i in 0 until list.size - 1) {
-            if (list[i + 1] - list[i] < 0) {
-                return false // Not rising by at least 10
+            nonDescendingCount++
+            if ((nonDescendingCount >= tolerance) && list[i + 1] - list[i] < 0) {
+                return false // Not rising aka not descending, and tolerance is exceeded
             }
         }
-        return true // All elements meet the descending condition
+        return true // List is leniently descending
+    }
+
+    fun isAscending(list: List<Double>): Boolean {
+        var nonAscendingCount = 0
+        val tolerance = 50
+
+        for (i in 0 until list.size - 1) {
+            nonAscendingCount++
+            if ((nonAscendingCount >= tolerance) && (list[i + 1] - list[i] > 0)) {
+                return false // Not sinking aka not ascending, and tolerance is exceeded
+            }
+        }
+        return true // List is leniently ascending
     }
 }
 
