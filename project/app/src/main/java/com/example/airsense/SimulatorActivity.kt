@@ -23,18 +23,14 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.NavigationBar
-import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -60,18 +56,16 @@ import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.airsense.components.AppTopBar
+import com.example.airsense.FlightStageManager.hasTakenOff
+import com.example.airsense.FlightStageManager.stageDetectionTimes
 import com.example.airsense.detector.algorithm.FlightDetectionAlgorithm
 import com.example.airsense.detector.algorithm.FlightState
 import com.example.compose.AirSenseTheme
 import dagger.hilt.android.AndroidEntryPoint
-import java.math.RoundingMode
 import java.time.Duration
 import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
-import javax.inject.Inject
-import kotlin.math.pow
 
 var finalTimestamp = 0L
 
@@ -108,7 +102,8 @@ object FlightStageManager {
         }
 
         if (currentStage !in stageDetectionTimes) {
-            _stageDetectionTimes.value = stageDetectionTimes + (currentStage to elapsedSimulationTime)
+            _stageDetectionTimes.value =
+                stageDetectionTimes + (currentStage to elapsedSimulationTime)
         }
 
         if (currentStage == "GROUNDED" && hasTakenOff) {
@@ -165,7 +160,8 @@ class SimulatorActivity : ComponentActivity() {
                                 .verticalScroll(rememberScrollState())
                         ) {
 
-                            val elapsedTime = (simulationViewModel.accelCurrentTimestamp - simulationViewModel.accelFirstTimestamp) / 1000000000
+                            val elapsedTime =
+                                (simulationViewModel.accelCurrentTimestamp - simulationViewModel.accelFirstTimestamp) / 1000000000
 
                             if (simulationViewModel.accelFirstTimestamp != 0L) {
                                 SimulationProgressCard(viewModel = simulationViewModel)
@@ -738,7 +734,7 @@ fun calculateDuration(startTime: String, endTime: String): String {
     val seconds = duration.seconds % 60
 
     // Format and return the result
-    return String.format(Locale.getDefault(),"%02d:%02d:%02d", hours, minutes, seconds)
+    return String.format(Locale.getDefault(), "%02d:%02d:%02d", hours, minutes, seconds)
 }
 
 fun calculateProgress(elapsed: Long, totalDuration: Long): Float {
