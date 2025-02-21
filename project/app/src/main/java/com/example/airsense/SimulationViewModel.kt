@@ -17,7 +17,7 @@ class SimulationViewModel @Inject constructor(
 ) : BaseViewModel() {
     var timeElapsed = 0L
     val flightDetectionAlgorithm = FlightDetectionAlgorithm()
-    private val defaultBatchSize = 7000
+    private val defaultBatchSize = 8000
     private val defaultCarryOver = 4000
     private var flying = false
 

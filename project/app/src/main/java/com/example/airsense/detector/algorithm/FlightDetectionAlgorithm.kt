@@ -12,6 +12,12 @@ class FlightDetectionAlgorithm {
     private var frequency = 100
     private var landingAccel = false
     private var landingBaroFlatten = false
+    private var decendingInARow = 0
+    private var barometerBumpIncrease = 0
+    private var maxBarometerBumpPressure = 0.0
+    private var takeoffAccel = false
+    private var takeoffBaro = false
+    private var landingAscend = false
 
     var listener: ((FlightState) -> Unit)? = null
 
@@ -68,7 +74,8 @@ class FlightDetectionAlgorithm {
 
         // Interpolate barometer data to match accelerometer timestamps
         //val interpolatedBarometerData = interpolateBarometerData(barometerData.toList(), timestamps)
-        val interpolatedBarometerData = barometerData.map { it[1] }
+        var interpolatedBarometerData = barometerData.map { it[1] }
+        interpolatedBarometerData = movingAverage(interpolatedBarometerData, 10 * frequency)
 
         flightState = detectTakeoffState(
             timestamps,
@@ -106,7 +113,7 @@ class FlightDetectionAlgorithm {
     ): FlightState {
         counter++
         //Log.d("FlightDetectionAlgorithm", "Counter: $counter")
-        val takeoffAccelerationThreshold = 0.35..0.8
+        val takeoffAccelerationThreshold = 0.35..1.6
         val takeoffDuration = 25.0 // seconds
         var takeoffStartTime = 0.0
         var inTakeoff = false
@@ -121,20 +128,42 @@ class FlightDetectionAlgorithm {
         // Convert nanoseconds to seconds for all timestamps
         val timestampsInSeconds = timestamps.map { it / 1_000_000_000.0 }
 
+        if (flightState == FlightState.GROUNDED) {
+            if (barometerBump(barometerData)) {
+                Log.d("FlightDetectionAlgorithm", "[ALGORITHM] Barometer bump detected.")
+                println("time of barometer bump: ${timestampsInSeconds.last() - (firstTimeStamp / 1_000_000_000.0)}")
+                takeoffBaro = true
+            }
+            if (takeoffAccel && takeoffBaro) {
+                Log.d("FlightDetectionAlgorithm", "[ALGORITHM] Takeoff detected.")
+                println("time of takeoff: ${timestampsInSeconds.last() - (firstTimeStamp / 1_000_000_000.0)}")
+                takeoffAccel = false
+                takeoffBaro = false
+                return FlightState.CLIMBING
+            }
+        }
+
         if (flightState == FlightState.CLIMBING) {
             //first lets check if we are climbing
             if (isCruising(barometerData)) {
-                Log.d("FlightDetectionAlgorithm", "[ALGORITHM] Cruising detected.")
+                Log.d(
+                    "FlightDetectionAlgorithm",
+                    "[ALGORITHM] Cruising detected at: ${timestampsInSeconds.last() - (firstTimeStamp / 1_000_000_000.0)}."
+                )
                 return FlightState.CRUISING
             }
             return FlightState.CLIMBING
         } else if (flightState == FlightState.CRUISING) {
-            if (isAscending(barometerData)) {
-                Log.d("FlightDetectionAlgorithm", "[ALGORITHM] Ascending detected.")
-                return FlightState.CLIMBING
-            }
+//            if (isAscending(barometerData)) {
+//                Log.d("FlightDetectionAlgorithm", "[ALGORITHM] Ascending detected.")
+//                return FlightState.CLIMBING
+//            }
             if (isDescending(barometerData)) {
-                Log.d("FlightDetectionAlgorithm", "[ALGORITHM] Descending detected.")
+                Log.d(
+                    "FlightDetectionAlgorithm",
+                    "[ALGORITHM] Descending detected at: ${timestampsInSeconds.last() - (firstTimeStamp / 1_000_000_000.0)}."
+                )
+                decendingInARow++
                 return FlightState.DESCENDING
             }
             return FlightState.CRUISING
@@ -144,28 +173,38 @@ class FlightDetectionAlgorithm {
 //                Log.d("FlightDetectionAlgorithm", "[ALGORITHM] Cruising detected.")
 //                return FlightState.CRUISING
 //            }
+//            if (isDescending(barometerData)) {
+//                decendingInARow++
+//                Log.d("decending in a row", "$decendingInARow")
+//            }
             //we are approaching the ground
-            for (i in smoothedAcceleration.indices) {
-                val currentAcceleration = smoothedAcceleration[i]
-                if (currentAcceleration > 4.0) {
-                    landingAccel = true
-                    println("acceleration for landing hit. ")
+            if (barometerData.last() > 960) {
+                for (i in smoothedAcceleration.indices) {
+                    val currentAcceleration = smoothedAcceleration[i]
+                    if (currentAcceleration > 2) {
+                        landingAccel = true
+//                        println("acceleration for landing hit. ")
 //                    Log.d("FlightDetectionAlgorithm", "Possible landing")
 //                    println("time of possible landing: ${timestampsInSeconds[i]}")
 //                    return FlightState.GROUNDED
+                    }
+                }
+                if (isCruising(barometerData)) {
+                    landingBaroFlatten = true
+                    decendingInARow = 0
+//                    println("barometer for landing hit. ")
+                }
+                if (isAscending(barometerData)) {
+                    landingAscend = true
+                }
+
+                if (landingAccel && landingBaroFlatten && landingAscend) {
+                    Log.d("FlightDetectionAlgorithm", "[ALGORITHM] Landed.")
+                    println("time of possible landing approx: ${timestampsInSeconds.last() - (firstTimeStamp / 1_000_000_000.0)}")
+                    decendingInARow = 0
+                    return FlightState.GROUNDED
                 }
             }
-
-            if (isCruising(barometerData)) {
-                landingBaroFlatten = true
-                println("barometer for landing hit. ")
-            }
-            if (landingAccel && landingBaroFlatten) {
-                Log.d("FlightDetectionAlgorithm", "[ALGORITHM] Landed.")
-                println("time of possible landing approx: ${timestampsInSeconds.last() - (firstTimeStamp / 1_000_000_000.0)}")
-                return FlightState.GROUNDED
-            }
-//            println("is cruising?: ${isCruising(barometerData)}")
             return FlightState.DESCENDING
         } else {
             for (i in smoothedAcceleration.indices) {
@@ -219,7 +258,7 @@ class FlightDetectionAlgorithm {
 
                     if (currentTime - endTime <= 30) {
                         currentAcceleration = smoothedAcceleration[i]
-                        if (currentAcceleration in 1.5..3.0) {
+                        if (currentAcceleration in 1.5..4.5) {
                             if (peakStartTime == 0.0) {
                                 peakStartTime = currentTime
                                 Log.d(
@@ -253,16 +292,19 @@ class FlightDetectionAlgorithm {
                                     }
                                     println("max variance accel: ${varianceAcceleration.max()}")
                                     if (!highVarianceFound) {
-                                        Log.d(
-                                            "FlightDetectionAlgorithm",
-                                            "[ALGORITHM] Takeoff detected."
-                                        )
-                                        Log.d(
-                                            "FlightDetectionAlgorithm",
-                                            "The takeoff time was ${finalTime - (firstTimeStamp / 1_000_000_000.0)}."
-                                        )
+//                                        Log.d(
+//                                            "FlightDetectionAlgorithm",
+//                                            "[ALGORITHM] Takeoff detected."
+//                                        )
+//                                        Log.d(
+//                                            "FlightDetectionAlgorithm",
+//                                            "The takeoff time was ${finalTime - (firstTimeStamp / 1_000_000_000.0)}."
+//                                        )
                                         latestPressures.clear()
-                                        return FlightState.CLIMBING // Takeoff detected
+
+                                        //return FlightState.CLIMBING // Takeoff detected
+                                        takeoffAccel = true
+                                        break
                                     } else {
                                         Log.d(
                                             "TakeoffDetection",
@@ -310,9 +352,60 @@ class FlightDetectionAlgorithm {
         return diff <= tolerance
     }
 
+    fun barometerBump(
+        list: List<Double>,
+        increaseThreshold: Double = 0.1,
+        decreaseThreshold: Double = 0.0,
+        totalDifferenceThreshold: Double = 4.5,
+        step: Int = 50
+    ): Boolean {
+        if (list.size < step * 2) return false // Ensure enough data points
+        if (barometerBumpIncrease > 0) {
+            barometerBumpIncrease++
+        }
+        if (barometerBumpIncrease > 3) {
+            maxBarometerBumpPressure = 0.0
+            barometerBumpIncrease = 0
+        }
+
+        var maxPressure = list.first()
+        var minPressure = list.first()
+        var increasing = false
+        var decreasing = false
+
+        for (i in step until list.size step step) {
+            val diff = list[i] - list[i - step]
+
+            if (diff > increaseThreshold) {
+                increasing = true
+                if (list[i] > maxPressure) {
+                    maxBarometerBumpPressure = list[i]
+                }
+                maxPressure = list[i]
+                if (barometerBumpIncrease == 0) {
+                    barometerBumpIncrease++
+                }
+            } else if ((diff < decreaseThreshold && increasing) || (diff < decreaseThreshold && barometerBumpIncrease > 0)) {
+                decreasing = true
+                if (list[i] < minPressure) {
+                    minPressure = list[i]
+                }
+            }
+
+            // Check if both increase and decrease happened and total difference is large enough
+            if (increasing && decreasing && (maxBarometerBumpPressure - minPressure) > totalDifferenceThreshold) {
+                return true
+            }
+        }
+        return false
+    }
+
     fun isDescending(list: List<Double>): Boolean {
         var nonDescendingCount = 0
         val tolerance = 50
+        if (list.first() - list.last() < -10) {
+            return true
+        }
 
         for (i in 0 until list.size - 1) {
             nonDescendingCount++
@@ -326,12 +419,17 @@ class FlightDetectionAlgorithm {
     fun isAscending(list: List<Double>): Boolean {
         var nonAscendingCount = 0
         val tolerance = 50
+        //Log.d("first and last difference ", "${list.first() - list.last()}")
 
-        for (i in 0 until list.size - 1) {
-            nonAscendingCount++
-            if ((nonAscendingCount >= tolerance) && (list[i + 1] - list[i] > 0)) {
-                return false // Not sinking aka not ascending, and tolerance is exceeded
-            }
+//        for (i in 0 until list.size - 1) {
+//            nonAscendingCount++
+//            if ((nonAscendingCount >= tolerance) && (list[i + 1] - list[i] > 0.1)) {
+//                return false // Not sinking aka not ascending, and tolerance is exceeded
+//            }
+//        }
+
+        if (list.first() - list.last() < 3) {
+            return false
         }
         return true // List is leniently ascending
     }
