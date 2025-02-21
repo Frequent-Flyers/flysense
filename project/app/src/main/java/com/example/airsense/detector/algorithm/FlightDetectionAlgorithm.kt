@@ -161,7 +161,7 @@ class FlightDetectionAlgorithm {
                 println("barometer for landing hit. ")
             }
             if (landingAccel && landingBaroFlatten) {
-                Log.d("FlightDetectionAlgorithm", "[ALGORITHM] Landing detected.")
+                Log.d("FlightDetectionAlgorithm", "[ALGORITHM] Landed.")
                 println("time of possible landing approx: ${timestampsInSeconds.last() - (firstTimeStamp / 1_000_000_000.0)}")
                 return FlightState.GROUNDED
             }

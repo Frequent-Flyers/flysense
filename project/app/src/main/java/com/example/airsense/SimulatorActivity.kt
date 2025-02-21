@@ -68,8 +68,6 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 var finalTimestamp = 0L
-val selectedSensors = mutableStateOf(setOf<String>())
-val selectedFiles = mutableSetOf<String>()
 
 data class BottomNavigationItem(
     val title: String,
@@ -196,8 +194,8 @@ class SimulatorActivity : ComponentActivity() {
                                     horizontalAlignment = Alignment.CenterHorizontally
                                 ) {
                                     SimulationSensorsCard(
-                                        onSensorSelectionChange = { selectedSensors.value = it },
-                                        selectedSensors = selectedSensors.value
+                                        onSensorSelectionChange = { selectedSensor = it },
+                                        selectedSensors = selectedSensor
                                     )
 
                                     MultiFilePicker(simulationViewModel)
@@ -529,136 +527,103 @@ fun MultiFilePicker(viewModel: SimulationViewModel) {
     val context = LocalContext.current
     val documentPicker =
         rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
-            // reset states each time the user selects new files
-            selectedFiles.clear()
-            viewModel.clearFromPreviousRuns()
-
-            val requiredFiles = mutableSetOf<String>()
             val dataStreams = mapOf(
                 CSVDataLoader.DataType.ACCELEROMETER to mutableListOf<List<Pair<Long, DoubleArray>>>(),
                 CSVDataLoader.DataType.BAROMETER to mutableListOf<List<Pair<Long, DoubleArray>>>()
             )
-
-            // determine required files
-            if ("Accelerometer" in selectedSensors.value) {
-                requiredFiles.add("Accelerometer")
-            }
-            if ("Barometer" in selectedSensors.value) {
-                requiredFiles.add("Barometer")
-            }
-
             var accelerometerData: List<Pair<Long, DoubleArray>>? = null
             var barometerData: List<Pair<Long, DoubleArray>>? = null
             var frequency: Double? = null
-            var fileErrorMessage: String? = null
 
             uris.forEach { uri ->
                 context.contentResolver.openInputStream(uri)?.use { inputStream ->
-                    val fileName = getFileNameFromUri(context.contentResolver, uri)
+                    val name = getFileNameFromUri(context.contentResolver, uri)
                     val dataType = when {
-                        fileName?.contains("Accelerometer", ignoreCase = true) == true -> {
-                            selectedFiles.add("Accelerometer")
-                            CSVDataLoader.DataType.ACCELEROMETER
-                        }
+                        name?.contains(
+                            "Accelerometer",
+                            ignoreCase = true
+                        ) == true -> CSVDataLoader.DataType.ACCELEROMETER
 
-                        fileName?.contains("Barometer", ignoreCase = true) == true -> {
-                            selectedFiles.add("Barometer")
-                            CSVDataLoader.DataType.BAROMETER
-                        }
+                        name?.contains(
+                            "Barometer",
+                            ignoreCase = true
+                        ) == true -> CSVDataLoader.DataType.BAROMETER
 
                         else -> CSVDataLoader.DataType.UNKNOWN
                     }
 
-                    if (dataType == CSVDataLoader.DataType.UNKNOWN) {
-                        fileErrorMessage = "The file '$fileName' is unrecognized."
-                        return@forEach
-                    }
+                    Log.d("SimulatorActivity", "File name: $name, Data type: $dataType")
 
                     val csvDataLoader = CSVDataLoader(inputStream, dataType)
-                    val (data, detectedFrequency) = csvDataLoader.loadData()
+                    val result = csvDataLoader.loadData()
+                    val data = result.first
 
-                    if (data.isEmpty()) {
-                        fileErrorMessage = "The file '$fileName' contains no valid data."
-                        return@forEach
-                    }
+                    if (data.isNotEmpty()) {
+                        when (dataType) {
+                            CSVDataLoader.DataType.ACCELEROMETER -> {
+                                accelerometerData = data
+                                frequency = result.second
+                                viewModel.frequency = frequency!!
+                                Log.d(
+                                    "SimulatorActivity",
+                                    "Loaded accelerometer data: ${data.size} points"
+                                )
+                            }
 
-                    when (dataType) {
-                        CSVDataLoader.DataType.ACCELEROMETER -> {
-                            accelerometerData = data
-                            frequency = detectedFrequency
+                            CSVDataLoader.DataType.BAROMETER -> {
+                                barometerData = data
+                                Log.d(
+                                    "SimulatorActivity",
+                                    "Loaded barometer data: ${data.size} points"
+                                )
+                            }
+
+                            else -> Log.e("SimulatorActivity", "Unknown data type")
                         }
-
-                        CSVDataLoader.DataType.BAROMETER -> {
-                            barometerData = data
-                        }
-
-                        else -> Unit
                     }
                 }
             }
 
-            // check for missing files relative to selected sensors
-            val missingFiles = requiredFiles - selectedFiles
-            if (missingFiles.isNotEmpty()) {
-                Toast.makeText(
-                    context,
-                    "Missing file(s): ${missingFiles.joinToString()}",
-                    Toast.LENGTH_SHORT
-                ).show()
-                return@rememberLauncherForActivityResult
-            }
-
-            if (requiredFiles.size == 1) {
-                val selectedSensor = requiredFiles.first()
-                if (selectedSensor == "Accelerometer" && accelerometerData == null) {
-                    Toast.makeText(context, "Please select a valid Accelerometer file.", Toast.LENGTH_SHORT).show()
-                    return@rememberLauncherForActivityResult
-                }
-                if (selectedSensor == "Barometer" && barometerData == null) {
-                    Toast.makeText(context, "Please select a valid Barometer file.", Toast.LENGTH_SHORT).show()
-                    return@rememberLauncherForActivityResult
-                }
-            }
-
+            // Process data after both accelerometer and barometer are loaded
             if (accelerometerData != null && barometerData != null) {
-                val safeAccelerometerData = accelerometerData
-                val safeBarometerData = barometerData
-                val accelerometerTimestamps = safeAccelerometerData?.map { it.first }
-
-                val interpolatedBarometerData = interpolateBarometerData(safeBarometerData!!, accelerometerTimestamps!!)
-                dataStreams[CSVDataLoader.DataType.ACCELEROMETER]?.add(safeAccelerometerData)
+                Log.d(
+                    "SimulatorActivity",
+                    "Both files have been loaded -> Interpolating barometerdata"
+                )
+                val accelerometerTimestamps = accelerometerData!!.map { it.first }
+                val interpolatedBarometerData =
+                    interpolateBarometerData(barometerData!!, accelerometerTimestamps)
+                dataStreams[CSVDataLoader.DataType.ACCELEROMETER]?.add(accelerometerData!!)
                 dataStreams[CSVDataLoader.DataType.BAROMETER]?.add(interpolatedBarometerData)
-
-                viewModel.setSimulatedData(dataStreams)
+                viewModel.clearFromPreviousRuns()
                 finalTimestamp = accelerometerTimestamps.last()
+                viewModel.setSimulatedData(dataStreams)
             } else {
-                Toast.makeText(context, "Please select the required files.", Toast.LENGTH_SHORT).show()
+                Log.e("SimulatorActivity", "Both files must be selected to proceed")
+                if (accelerometerData == null) {
+                    Toast.makeText(
+                        context,
+                        "Please select an accelerometer file.",
+                        Toast.LENGTH_SHORT
+                    ).show()
+                } else {
+                    Toast.makeText(context, "Please select a barometer file.", Toast.LENGTH_SHORT)
+                        .show()
+                }
             }
         }
 
     var shouldLaunchPicker by remember { mutableStateOf(false) }
 
     if (shouldLaunchPicker) {
-        documentPicker.launch(arrayOf("*/*"))
+        documentPicker.launch(arrayOf("*/*")) // all files temporarily
         shouldLaunchPicker = false
     }
 
-    val areSensorsSelected = selectedSensors.value.isNotEmpty()
-
-    Button(
-        onClick = { shouldLaunchPicker = true },
-        enabled = areSensorsSelected,
-        colors = ButtonDefaults.buttonColors(
-            containerColor = if (areSensorsSelected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surface,
-            contentColor = if (areSensorsSelected) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
-        ),
-    ) {
+    Button(onClick = { shouldLaunchPicker = true }) {
         Text("Select Flight Files")
     }
 }
-
-
-
 
 fun getFileNameFromUri(contentResolver: ContentResolver, uri: Uri): String? {
     var fileName: String? = null
