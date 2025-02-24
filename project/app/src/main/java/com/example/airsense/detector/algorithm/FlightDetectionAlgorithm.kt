@@ -41,6 +41,18 @@ class FlightDetectionAlgorithm {
         frequency = newFrequency
     }
 
+    fun forceFlight() {
+        flightState = FlightState.CLIMBING
+        lastFlightState = FlightState.GROUNDED
+        updateState()
+    }
+
+    fun forceLanding() {
+        flightState = FlightState.GROUNDED
+        lastFlightState = FlightState.DESCENDING
+        updateState()
+    }
+
     fun processData(accelerometerData: List<List<Double>>, barometerData: List<List<Double>>) {
         if (accelerometerData.isEmpty() || barometerData.isEmpty()) {
             Log.e("FlightDetectionAlgorithm", "Received empty sensor data for processing")

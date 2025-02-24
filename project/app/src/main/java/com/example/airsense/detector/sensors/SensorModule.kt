@@ -31,25 +31,6 @@ object SensorModule {
         )
     }
 
-    // Provide the orientation sensor
-    @Provides
-    @Singleton
-    @Named("realOrientationSensor")
-    fun provideOrientationSensor(app: Application): MeasurableSensor {
-        return OrientationSensor(app)
-    }
-
-    // Provide the fake orientation sensor
-//    @Provides
-//    @Singleton
-//    @Named("simulatedOrientationSensor")
-//    fun provideSimulatedOrientationSensor(): MeasurableSensor {
-//        return SimulatedOrientationSensor(
-//            CSVDataLoader(null, CSVDataLoader.DataType.ORIENTATION),
-//            SPEED
-//        )
-//    }
-
     // Provide the barometer sensor
     @Provides
     @Singleton
@@ -77,15 +58,6 @@ object SensorModule {
         val inputStream = application.assets.open("Accelerometer.csv")
         return CSVDataLoader(inputStream, CSVDataLoader.DataType.ACCELEROMETER)
     }
-
-    // Provide the CSVDataLoader for the orientation sensor
-//    @Provides
-//    @Singleton
-//    @Named("orientationCSVLoader")
-//    fun provideOrientationCSVDataLoader(application: Application): CSVDataLoader {
-//        val inputStream = application.assets.open("Orientation.csv")
-//        return CSVDataLoader(inputStream, CSVDataLoader.DataType.ORIENTATION)
-//    }
 
     // Provide the CSVDataLoader for the barometer sensor
     @Provides

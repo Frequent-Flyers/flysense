@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
@@ -24,26 +26,29 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.example.airsense.components.AppTopBar
+import com.example.airsense.detector.algorithm.FlightDetectionAlgorithm
+import com.example.airsense.detector.algorithm.FlightState
 import com.example.compose.AirSenseTheme
 import dagger.hilt.android.AndroidEntryPoint
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     private lateinit var viewModel: MainViewModel
+    private lateinit var flightDetectionAlgorithm: FlightDetectionAlgorithm
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -52,7 +57,14 @@ class MainActivity : ComponentActivity() {
         setContent {
             AirSenseTheme {
                 viewModel = viewModel<MainViewModel>()
+                flightDetectionAlgorithm = viewModel.flightDetectionAlgorithm
                 var selectedItemIndex by remember { mutableIntStateOf(0) }
+                var flightState by remember { mutableStateOf(FlightState.GROUNDED) }
+
+                flightDetectionAlgorithm.listener = { newFlightState ->
+                    Log.d("MainActivity", "[REALTIME] New flight state: $newFlightState")
+                    flightState = newFlightState
+                }
 
                 Scaffold(
                     bottomBar = {
@@ -80,7 +92,10 @@ class MainActivity : ComponentActivity() {
                         verticalArrangement = Arrangement.Center,
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        FlightStatusCard(viewModel)
+                        FlightStatusCard(viewModel, flightState, onEndSimulationClick = {
+                            if (flightState == FlightState.GROUNDED) viewModel.flightDetectionAlgorithm.forceFlight()
+                            else viewModel.flightDetectionAlgorithm.forceLanding()
+                        })
                     }
                 }
 
@@ -102,11 +117,13 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun FlightStatusCard(
     viewModel: MainViewModel,
+    flightState: FlightState,
     acceleration: Double = 0.3,
     variance: Double = 1.3,
     pressure: Double = 1013.0,
     altitude: Double = 33.0,
-    status: String = "grounded" // default status and placeholder
+    status: String = "grounded", // default status and placeholder
+    onEndSimulationClick: () -> Unit
 ) {
     Card(
         modifier = Modifier
@@ -132,15 +149,15 @@ fun FlightStatusCard(
                     horizontalArrangement = Arrangement.Center
                 ) {
                     Icon(
-                        imageVector = ImageVector.vectorResource(id = R.drawable.grounded),
-                        contentDescription = "Grounded Icon",
+                        imageVector = ImageVector.vectorResource(id = if (flightState == FlightState.GROUNDED) R.drawable.grounded else R.drawable.cruising),
+                        contentDescription = "Grounded/Cruising Icon",
                         tint = MaterialTheme.colorScheme.primary,
                         modifier = Modifier
                             .size(32.dp)
                             .padding(end = 8.dp)
                     )
                     Text(
-                        text = "You are currently $status.",
+                        text = "You are currently ${if (flightState == FlightState.GROUNDED) "on ground" else "flying"}.",
                         style = MaterialTheme.typography.titleMedium.copy(
                             fontStyle = androidx.compose.ui.text.font.FontStyle.Italic,
                             fontWeight = FontWeight.Medium
@@ -160,7 +177,7 @@ fun FlightStatusCard(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 InfoRow(label = "Acceleration", value = "${viewModel.absoluteAcceleration}/s²")
-                InfoRow(label = "Average Variance", value = "$variance m/s³")
+//                InfoRow(label = "Average Variance", value = "$variance m/s³")
             }
 
             Spacer(modifier = Modifier.height(16.dp))
@@ -173,7 +190,22 @@ fun FlightStatusCard(
                 )
                 Spacer(modifier = Modifier.height(8.dp))
                 InfoRow(label = "Pressure", value = "${viewModel.pressure} hPa")
-                InfoRow(label = "Altitude", value = "$altitude m")
+//                InfoRow(label = "Altitude", value = "$altitude m")
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            Button(
+                onClick = onEndSimulationClick,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error
+                ),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    text = if (flightState == FlightState.GROUNDED) "Force takeoff" else "Force landing",
+                    color = Color.Black
+                )
             }
         }
     }

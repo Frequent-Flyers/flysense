@@ -175,7 +175,7 @@ class SimulatorActivity : ComponentActivity() {
                                         elapsedTime % 60
                                     ),
                                     onEndSimulationClick = {
-
+                                        simulationViewModel.flightDetectionAlgorithm.forceLanding()
                                     }
                                 )
                             }
@@ -253,7 +253,8 @@ fun SimulationProgressCard(viewModel: SimulationViewModel) {
     } else {
         MaterialTheme.colorScheme.onSurfaceVariant
     }
-
+    Spacer(modifier = Modifier.height(8.dp))
+    Spacer(modifier = Modifier.height(8.dp))
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -276,7 +277,7 @@ fun SimulationProgressCard(viewModel: SimulationViewModel) {
                 )
                 if (hasEnded) {
                     Text(
-                        text = "Duration: ${
+                        text = "Flight Duration: ${
                             calculateDuration(
                                 stageDetectionTimes["CLIMBING"] ?: "00:00:00",
                                 stageDetectionTimes["GROUNDED"] ?: "00:00:00"

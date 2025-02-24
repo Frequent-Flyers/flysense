@@ -166,18 +166,6 @@ class SimulationViewModel @Inject constructor(
     }
 
     fun setSimulatedData(dataStreams: Map<CSVDataLoader.DataType, MutableList<List<Pair<Long, DoubleArray>>>>) {
-//        dataStreams = data
-//        dataStreams?.let { streams ->
-//            streams[CSVDataLoader.DataType.ACCELEROMETER]?.forEach {
-//                simulatedAccelerometerSensor.loadData(it)
-//            }
-//            streams[CSVDataLoader.DataType.ORIENTATION]?.forEach {
-//                simulatedOrientationSensor.loadData(it)
-//            }
-//            streams[CSVDataLoader.DataType.BAROMETER]?.forEach {
-//                simulatedBarometerSensor.loadData(it)
-//            }
-//        }
         dataStreams.forEach { mapEntry ->
             val dataType = mapEntry.key
             val data = mapEntry.value

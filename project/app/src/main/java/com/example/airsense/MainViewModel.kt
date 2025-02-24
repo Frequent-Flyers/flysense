@@ -11,19 +11,16 @@ import kotlin.math.sqrt
 class MainViewModel @Inject constructor(
     @Named("realAccelerometerSensor") private val realAccelerometerSensor: MeasurableSensor,
 
-    @Named("realOrientationSensor") private val realOrientationSensor: MeasurableSensor,
-
     @Named("realBarometerSensor") private val realBarometerSensor: MeasurableSensor
 ) : BaseViewModel() {
-    private val flightDetectionAlgorithm = FlightDetectionAlgorithm()
+    val flightDetectionAlgorithm = FlightDetectionAlgorithm()
 
     private lateinit var currentAccelerometerSensor: MeasurableSensor
-    private lateinit var currentOrientationSensor: MeasurableSensor
     private lateinit var currentBarometerSensor: MeasurableSensor
     private var accelQueue = ArrayDeque<List<Double>>()
     private var baroQueue = ArrayDeque<List<Double>>()
-    private val batchSize = 7000 / 2 // 50 Hz
-    private val carryOver = 4000 / 2 // 50 Hz
+    private val batchSize = 8000
+    private val carryOver = 4000
     var isProcessing = false
 
 //    private val flightDetectionAlgorithm = FlightDetectionAlgorithm()
@@ -31,11 +28,10 @@ class MainViewModel @Inject constructor(
     init {
         // Start with the real accelerometer sensor by default
         currentAccelerometerSensor = realAccelerometerSensor
-        currentOrientationSensor = realOrientationSensor
         currentBarometerSensor = realBarometerSensor
         startAccelerometerSensor()
         startBarometerSensor()
-        flightDetectionAlgorithm.adjustFrequency(50)
+        //flightDetectionAlgorithm.adjustFrequency(50)
     }
 
     private fun startAccelerometerSensor() {
@@ -74,42 +70,6 @@ class MainViewModel @Inject constructor(
                 isProcessing = false
             }
         }
-    }
-
-    fun toggleSensor() {
-        // Stop the current sensor
-//        currentAccelerometerSensor.stopListening()
-//        currentOrientationSensor.stopListening()
-//        currentBarometerSensor.stopListening()
-//
-//        //clear the deques in the flight detection algorithm
-//        flightDetectionAlgorithm.reset()
-//
-//        // Toggle between real and fake sensors
-//        useFakeSensor = !useFakeSensor
-//        currentAccelerometerSensor = if (useFakeSensor) {
-//            simulatedAccelerometerSensor
-//        } else {
-//            realAccelerometerSensor
-//        }
-//
-//        currentOrientationSensor = if (useFakeSensor) {
-//            simulatedOrientationSensor
-//        } else {
-//            realOrientationSensor
-//        }
-//
-//        currentBarometerSensor = if (useFakeSensor) {
-//            simulatedBarometerSensor
-//        } else {
-//            realBarometerSensor
-//        }
-//
-//        // Start the new sensor
-//        startAccelerometerSensor()
-//        startOrientationSensor()
-//        startBarometerSensor()
-//        Log.d("MainViewModel", "Using ${if (useFakeSensor) "fake" else "real"} sensor.")
     }
 
 
@@ -153,19 +113,16 @@ class MainViewModel @Inject constructor(
     override fun onCleared() {
         super.onCleared()
         currentAccelerometerSensor.stopListening()
-        currentOrientationSensor.stopListening()
         currentBarometerSensor.stopListening()
     }
 
     fun stopListening() {
         currentAccelerometerSensor.stopListening()
-        currentOrientationSensor.stopListening()
         currentBarometerSensor.stopListening()
     }
 
     fun startListening() {
         currentAccelerometerSensor.startListening()
-        currentOrientationSensor.startListening()
         currentBarometerSensor.startListening()
     }
 }
