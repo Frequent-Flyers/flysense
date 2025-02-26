@@ -573,6 +573,10 @@ fun MultiFilePicker(viewModel: SimulationViewModel) {
 
                             CSVDataLoader.DataType.BAROMETER -> {
                                 barometerData = data
+                                if (frequency == null) {
+                                    frequency = result.second
+                                    viewModel.frequency = frequency!!
+                                }
                                 Log.d(
                                     "SimulatorActivity",
                                     "Loaded barometer data: ${data.size} points"
@@ -584,7 +588,19 @@ fun MultiFilePicker(viewModel: SimulationViewModel) {
                     }
                 }
             }
-
+            if (accelerometerData == null && barometerData != null) {
+                // If accelerometer data is missing, create placeholder data with 0 values
+                accelerometerData = barometerData!!.map { (timestamp, _) ->
+                    Pair(timestamp, doubleArrayOf(0.0, 0.0, 0.0)) // 0 acceleration for all axes
+                }
+                Log.d("SimulatorActivity", "Created placeholder accelerometer data")
+            } else if (barometerData == null && accelerometerData != null) {
+                // If barometer data is missing, create placeholder data with 0 values
+                barometerData = accelerometerData!!.map { (timestamp, _) ->
+                    Pair(timestamp, doubleArrayOf(0.0)) // 0 pressure
+                }
+                Log.d("SimulatorActivity", "Created placeholder barometer data")
+            }
             // Process data after both accelerometer and barometer are loaded
             if (accelerometerData != null && barometerData != null) {
                 Log.d(
@@ -607,9 +623,15 @@ fun MultiFilePicker(viewModel: SimulationViewModel) {
                         "Please select an accelerometer file.",
                         Toast.LENGTH_SHORT
                     ).show()
-                } else {
+                } else if (barometerData == null) {
                     Toast.makeText(context, "Please select a barometer file.", Toast.LENGTH_SHORT)
                         .show()
+                } else {
+                    Toast.makeText(
+                        context,
+                        "Please select simulation files.",
+                        Toast.LENGTH_SHORT
+                    ).show()
                 }
             }
         }
