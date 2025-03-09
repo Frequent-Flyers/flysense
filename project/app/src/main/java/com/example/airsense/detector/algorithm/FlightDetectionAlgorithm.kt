@@ -1,8 +1,11 @@
 package com.example.airsense.detector.algorithm
 
 import android.util.Log
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import javax.inject.Inject
 
-class FlightDetectionAlgorithm {
+class FlightDetectionAlgorithm @Inject constructor() {
     private var lastFlightState = FlightState.GROUNDED
     private var flightStartTime = 0.0
     private var counter = 0
@@ -18,17 +21,60 @@ class FlightDetectionAlgorithm {
     private var takeoffAccel = false
     private var takeoffBaro = false
     private var landingAscend = false
-    private var onlyAccel = false
-    private var onlyBaro = false
+    var onlyAccel = false
+    var onlyBaro = false
     private var takeoffBaroTimer = 0
     private var takeoffAccelTimer = 0
 
     var listener: ((FlightState) -> Unit)? = null
+    private val listeners = mutableListOf<(FlightState) -> Unit>()
+
+    fun addListener(listener: (FlightState) -> Unit) {
+        listeners.add(listener)
+    }
+
+    fun removeListener(listener: (FlightState) -> Unit) {
+        listeners.remove(listener)
+    }
+
+    private fun notifyListeners(newState: FlightState) {
+        listeners.forEach { it(newState) }
+    }
+
+    fun detectFlightStateChange(newState: FlightState) {
+        notifyListeners(newState)
+    }
 
     private fun updateState() {
         if (flightState != lastFlightState) {
             Log.d("FlightDetectionAlgorithm", "[ALGORITHM] Flight state updated to $flightState.")
             listener?.invoke(flightState)
+            Log.d("FlightDetectionAlgorithm", "[ALGORITHM] Listener invoked with state: $flightState.")
+        }
+    }
+
+    fun setDetectionMode(mode: String) {
+        when (mode) {
+            "Primary" -> {
+                onlyBaro = false
+                onlyAccel = false
+            }
+            "A" -> {
+                onlyBaro = false
+                onlyAccel = true
+            }
+            "B" -> {
+                onlyBaro = true
+                onlyAccel = false
+            }
+        }
+    }
+
+    fun getDetectionMode(): String {
+        return when {
+            onlyBaro -> "B"
+            onlyAccel -> "A"
+            else -> "Primary"
         }
     }
 
@@ -49,12 +95,16 @@ class FlightDetectionAlgorithm {
         flightState = FlightState.CLIMBING
         lastFlightState = FlightState.GROUNDED
         updateState()
+
+        detectFlightStateChange(flightState)
     }
 
     fun forceLanding() {
         flightState = FlightState.GROUNDED
         lastFlightState = FlightState.DESCENDING
         updateState()
+
+        detectFlightStateChange(flightState)
     }
 
     fun processData(accelerometerData: List<List<Double>>, barometerData: List<List<Double>>) {

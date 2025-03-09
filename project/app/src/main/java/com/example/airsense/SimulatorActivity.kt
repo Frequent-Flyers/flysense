@@ -120,7 +120,6 @@ class SimulatorActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        setImmersiveMode()
 
         setContent {
             AirSenseTheme {
@@ -145,8 +144,11 @@ class SimulatorActivity : ComponentActivity() {
                                     val intent = Intent(this, MainActivity::class.java)
                                     startActivity(intent)
                                 }
-                                if (index == 1) finish()
-                                if (index == 2) Log.d("SimulatorActivity", "Settings clicked")
+                                // if (index == 1) finish()
+                                if (index == 2) {
+                                    val intent = Intent(this, SettingsActivity::class.java)
+                                    startActivity(intent)
+                                }
                             }
                         )
                     }

@@ -1,8 +1,12 @@
 package com.example.airsense
 
 import com.example.airsense.detector.algorithm.FlightDetectionAlgorithm
+import com.example.airsense.detector.algorithm.FlightState
 import com.example.airsense.detector.sensors.MeasurableSensor
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import javax.inject.Inject
 import javax.inject.Named
 import kotlin.math.sqrt
@@ -10,10 +14,10 @@ import kotlin.math.sqrt
 @HiltViewModel
 class MainViewModel @Inject constructor(
     @Named("realAccelerometerSensor") private val realAccelerometerSensor: MeasurableSensor,
-
-    @Named("realBarometerSensor") private val realBarometerSensor: MeasurableSensor
+    @Named("realBarometerSensor") private val realBarometerSensor: MeasurableSensor,
+    val flightDetectionAlgorithm: FlightDetectionAlgorithm
 ) : BaseViewModel() {
-    val flightDetectionAlgorithm = FlightDetectionAlgorithm()
+
 
     private lateinit var currentAccelerometerSensor: MeasurableSensor
     private lateinit var currentBarometerSensor: MeasurableSensor
@@ -22,6 +26,9 @@ class MainViewModel @Inject constructor(
     private val batchSize = 8000
     private val carryOver = 4000
     var isProcessing = false
+
+    private val _flightState = MutableStateFlow(FlightState.GROUNDED)
+    val flightState: StateFlow<FlightState> = _flightState.asStateFlow()
 
 //    private val flightDetectionAlgorithm = FlightDetectionAlgorithm()
 
@@ -32,6 +39,14 @@ class MainViewModel @Inject constructor(
         startAccelerometerSensor()
         startBarometerSensor()
         //flightDetectionAlgorithm.adjustFrequency(50)
+
+        //flightDetectionAlgorithm.listener = { newState ->
+        //    _flightState.value = newState
+        //}
+
+        flightDetectionAlgorithm.addListener { newState ->
+            _flightState.value = newState
+        }
     }
 
     private fun startAccelerometerSensor() {
