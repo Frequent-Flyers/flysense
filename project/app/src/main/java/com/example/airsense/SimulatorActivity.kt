@@ -590,8 +590,24 @@ fun MultiFilePicker(viewModel: SimulationViewModel) {
             }
             if (accelerometerData == null && barometerData != null) {
                 // If accelerometer data is missing, create placeholder data with 0 values
-                accelerometerData = barometerData!!.map { (timestamp, _) ->
-                    Pair(timestamp, doubleArrayOf(0.0, 0.0, 0.0)) // 0 acceleration for all axes
+                val originalTimestamps = barometerData!!.map { it.first }
+                //check if size of timestamp list is smaller than 100k
+                if (originalTimestamps.size < 100_000) {
+                    val interpolatedTimestamps = interpolateTimestamps(originalTimestamps, 20)
+
+                    accelerometerData = interpolatedTimestamps.map { timestamp ->
+                        Pair(timestamp, doubleArrayOf(0.0, 0.0, 0.0)) // 0 acceleration for all axes
+                    }
+                    val intervals =
+                        interpolatedTimestamps.zipWithNext { first, second -> second - first }
+                    val averageInterval =
+                        intervals.average() / 1_000_000_000.0 // Convert ns to seconds
+                    val frequency = if (averageInterval > 0) 1.0 / averageInterval else 0.0
+                    viewModel.frequency = frequency
+                } else {
+                    accelerometerData = barometerData!!.map { (timestamp, _) ->
+                        Pair(timestamp, doubleArrayOf(0.0, 0.0, 0.0)) // 0 acceleration for all axes
+                    }
                 }
                 Log.d("SimulatorActivity", "Created placeholder accelerometer data")
             } else if (barometerData == null && accelerometerData != null) {
@@ -742,6 +758,24 @@ private fun findNearestIndices(
             minOf(data.lastIndex, insertionPoint) // Upper bound
         )
     }
+}
+
+fun interpolateTimestamps(originalTimestamps: List<Long>, factor: Int): List<Long> {
+    val interpolatedTimestamps = mutableListOf<Long>()
+
+    for (i in 0 until originalTimestamps.size - 1) {
+        val startTime = originalTimestamps[i]
+        val endTime = originalTimestamps[i + 1]
+        val interval = (endTime - startTime) / factor
+
+        for (j in 0 until factor) {
+            interpolatedTimestamps.add(startTime + j * interval)
+        }
+    }
+    // Add the last timestamp
+    interpolatedTimestamps.add(originalTimestamps.last())
+
+    return interpolatedTimestamps
 }
 
 fun calculateDuration(startTime: String, endTime: String): String {

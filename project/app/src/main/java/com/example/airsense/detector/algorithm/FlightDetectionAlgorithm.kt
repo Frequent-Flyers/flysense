@@ -22,6 +22,7 @@ class FlightDetectionAlgorithm {
     private var onlyBaro = false
     private var takeoffBaroTimer = 0
     private var takeoffAccelTimer = 0
+    private var stepSizeBaroBump = 50
 
     var listener: ((FlightState) -> Unit)? = null
 
@@ -43,6 +44,10 @@ class FlightDetectionAlgorithm {
     fun adjustFrequency(newFrequency: Int) {
         println("adjusting frequency")
         frequency = newFrequency
+        if (frequency != stepSizeBaroBump) {
+            println("setting step size to $frequency")
+            stepSizeBaroBump = frequency
+        }
     }
 
     fun forceFlight() {
@@ -155,14 +160,14 @@ class FlightDetectionAlgorithm {
         if (flightState == FlightState.GROUNDED) {
             if (takeoffBaro) {
                 takeoffBaroTimer++
-                if (takeoffBaroTimer > 3) {
+                if (takeoffBaroTimer > 5) {
                     takeoffBaro = false
                     takeoffBaroTimer = 0
                 }
             }
             if (takeoffAccel) {
                 takeoffAccelTimer++
-                if (takeoffAccelTimer > 3) {
+                if (takeoffAccelTimer > 5) {
                     takeoffAccel = false
                     takeoffAccelTimer = 0
                 }
@@ -225,7 +230,7 @@ class FlightDetectionAlgorithm {
 //                Log.d("decending in a row", "$decendingInARow")
 //            }
             //we are approaching the ground
-            if (barometerData.last() > 960) {
+            if (barometerData.last() > 925) {
                 for (i in smoothedAcceleration.indices) {
                     val currentAcceleration = smoothedAcceleration[i]
                     if (currentAcceleration > 2) {
@@ -417,6 +422,16 @@ class FlightDetectionAlgorithm {
             takeoffAccel = false
             takeoffBaro = false
             return true
+        } else if (onlyAccel && takeoffAccel) {
+            Log.d("FlightDetectionAlgorithm", "[ALGORITHM] Takeoff detected with only accel.")
+            takeoffAccel = false
+            takeoffBaro = false
+            return true
+        } else if (onlyBaro && takeoffBaro) {
+            Log.d("FlightDetectionAlgorithm", "[ALGORITHM] Takeoff detected with only baro.")
+            takeoffAccel = false
+            takeoffBaro = false
+            return true
         }
         return false
     }
@@ -425,7 +440,7 @@ class FlightDetectionAlgorithm {
         list: List<Double>,
         timestamps: List<Double>,
         increaseThreshold: Double = 0.1,
-        decreaseThreshold: Double = 0.0,
+        decreaseThreshold: Double = -0.1,
         totalDifferenceThreshold: Double = 4.5,
         step: Int = 50
     ): Boolean {
@@ -442,20 +457,32 @@ class FlightDetectionAlgorithm {
         var minPressure = list.first()
         var increasing = false
         var decreasing = false
+        var increasingAfterDecrease = 0
 
-        for (i in step until list.size step step) {
-            val diff = list[i] - list[i - step]
+        for (i in stepSizeBaroBump until list.size step stepSizeBaroBump) {
+            val diff = list[i] - list[i - stepSizeBaroBump]
 
             if (diff > increaseThreshold) {
+                if (decreasing) {
+                    increasingAfterDecrease++
+                    if (increasingAfterDecrease > 3) {
+                        //println("increasing after decrease: $increasingAfterDecrease")
+                        decreasing = false
+                        increasingAfterDecrease = 0
+                    }
+                }
+                //println("diff pos: $diff")
                 increasing = true
                 if (list[i] > maxPressure) {
                     maxBarometerBumpPressure = list[i]
                 }
                 maxPressure = list[i]
                 if (barometerBumpIncrease == 0) {
+                    //println("barometer bump increase: ${(timestamps[i] / 1_000_000_000.0) - (firstTimeStamp / 1_000_000_000.0)} ")
                     barometerBumpIncrease++
                 }
             } else if ((diff < decreaseThreshold && increasing) || (diff < decreaseThreshold && barometerBumpIncrease > 0)) {
+                //println("diff negative: $diff")
                 decreasing = true
                 if (list[i] < minPressure) {
                     minPressure = list[i]
@@ -500,7 +527,7 @@ class FlightDetectionAlgorithm {
 //        }
         val minPressure = list.minOrNull() ?: return false
         val maxPressure = list.maxOrNull() ?: return false
-        if (maxPressure - minPressure < 3) {
+        if (maxPressure - minPressure < 2.5) {
             return false
         }
         //also check if min pressure comes after max pressure

@@ -20,7 +20,7 @@ class MainViewModel @Inject constructor(
     private var accelQueue = ArrayDeque<List<Double>>()
     private var baroQueue = ArrayDeque<List<Double>>()
     private val batchSize = 8000
-    private val carryOver = 4000
+    private val carryOver = 6000
     var isProcessing = false
 
 //    private val flightDetectionAlgorithm = FlightDetectionAlgorithm()
