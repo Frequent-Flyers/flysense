@@ -8,7 +8,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 
 object NotificationHelper {
-    private const val CHANNEL_ID = "fds_state_channel"
+    const val CHANNEL_ID = "fds_state_channel"
     private const val CHANNEL_NAME = "FDS State"
     private const val CHANNEL_DESCRIPTION = "Channel for FDS state notifications"
 
@@ -16,9 +16,9 @@ object NotificationHelper {
         val channel = NotificationChannel(
             CHANNEL_ID,
             CHANNEL_NAME,
-            NotificationManager.IMPORTANCE_DEFAULT
+            NotificationManager.IMPORTANCE_LOW // Important for foreground
         ).apply {
-            description = CHANNEL_DESCRIPTION
+            CHANNEL_DESCRIPTION
         }
 
         val notificationManager = context.getSystemService(NotificationManager::class.java)
