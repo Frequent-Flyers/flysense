@@ -62,11 +62,11 @@ class MainViewModel @Inject constructor(
             if (!isProcessing && accelQueue.size >= batchSize && baroQueue.size >= batchSize) {
                 isProcessing = true
                 processNextBatch(
-                    accelQueue.take(batchSize),
-                    baroQueue.take(batchSize)
+                    accelQueue.toList(),
+                    baroQueue.toList()
                 ) // Only send batches
-                removeOldestData(accelQueue, batchSize - carryOver) // Remove 3k oldest points
-                removeOldestData(baroQueue, batchSize - carryOver) // Remove 3k oldest points
+                removePercentageOldestData(accelQueue, 0.25)
+                removePercentageOldestData(baroQueue, 0.25)
                 isProcessing = false
             }
         }
@@ -102,8 +102,9 @@ class MainViewModel @Inject constructor(
         flightDetectionAlgorithm.processData(accelerometerData, barometerData)
     }
 
-    private fun <T> removeOldestData(queue: ArrayDeque<T>, removeCount: Int) {
+    private fun <T> removePercentageOldestData(queue: ArrayDeque<T>, percentage: Double) {
         synchronized(queue) {
+            val removeCount = (queue.size * percentage).toInt()
             repeat(removeCount.coerceAtMost(queue.size)) { // Avoid removing more than the queue size
                 queue.removeFirst()
             }
