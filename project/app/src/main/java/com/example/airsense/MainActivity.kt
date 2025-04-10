@@ -1,10 +1,13 @@
 package com.example.airsense
 
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -26,45 +29,57 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.res.vectorResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.airsense.data.FlightStateNotifier
+import com.example.airsense.data.NotificationHelper
 import com.example.airsense.detector.algorithm.FlightDetectionAlgorithm
 import com.example.airsense.detector.algorithm.FlightState
 import com.example.compose.AirSenseTheme
 import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
+import android.Manifest
 
 @AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     private lateinit var viewModel: MainViewModel
     private lateinit var flightDetectionAlgorithm: FlightDetectionAlgorithm
+    @Inject lateinit var flightStateNotifier: FlightStateNotifier
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        Log.d("MainActivity", "onCreate")
+        enableEdgeToEdge()
+
+        // notification related queries
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), 101)
+            }
+        }
+        NotificationHelper.createNotificationChannel(this)
+
+        val intent = Intent(this, FlightDetectionService::class.java)
+        ContextCompat.startForegroundService(this, intent)
 
         setContent {
             AirSenseTheme {
                 viewModel = viewModel<MainViewModel>()
                 flightDetectionAlgorithm = viewModel.flightDetectionAlgorithm
                 var selectedItemIndex by remember { mutableIntStateOf(0) }
-                var flightState by remember { mutableStateOf(FlightState.GROUNDED) }
-
-                flightDetectionAlgorithm.listener = { newFlightState ->
-                    Log.d("MainActivity", "[REALTIME] New flight state: $newFlightState")
-                    flightState = newFlightState
-                }
+                val flightState by viewModel.flightState.collectAsState()
 
                 Scaffold(
                     bottomBar = {
@@ -72,14 +87,16 @@ class MainActivity : ComponentActivity() {
                             selectedItemIndex = selectedItemIndex,
                             onItemSelected = { index ->
                                 selectedItemIndex = index
-                                if (index == 0) finish()
+                                // if (index == 0) finish()
                                 if (index == 1) {
                                     val intent = Intent(this, SimulatorActivity::class.java)
                                     startActivity(intent)
                                     viewModel.stopListening()
                                 }
                                 if (index == 2) {
-                                    Log.d("MainActivity", "Settings selected")
+                                    val intent = Intent(this, SettingsActivity::class.java)
+                                    startActivity(intent)
+                                    viewModel.stopListening()
                                 }
                             }
                         )
@@ -203,8 +220,8 @@ fun FlightStatusCard(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 Text(
-                    text = if (flightState == FlightState.GROUNDED) "Force takeoff" else "Force landing",
-                    color = Color.Black
+                    text = if (flightState == FlightState.GROUNDED) "Force Takeoff" else "Force Landing",
+                    color = MaterialTheme.colorScheme.onError
                 )
             }
         }

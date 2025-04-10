@@ -92,18 +92,25 @@ class SimulationViewModel @Inject constructor(
             synchronized(this) {
                 if (!isProcessing && accelerometerQueue.size >= batchSize && barometerQueue.size >= batchSize) {
                     isProcessing = true
-                    processNextBatch(
-                        accelerometerQueue.take(batchSize),
-                        barometerQueue.take(batchSize)
-                    ) // Only send batches
-                    removeOldestData(
-                        accelerometerQueue,
-                        batchSize - carryOver
-                    ) // Remove 3k oldest points
-                    removeOldestData(
-                        barometerQueue,
-                        batchSize - carryOver
-                    ) // Remove 3k oldest points
+
+                    // new! additional copies of the data to prevent concurrent modifications
+                    val accelBatch = mutableListOf<List<Double>>()
+                    val baroBatch = mutableListOf<List<Double>>()
+
+                    synchronized(accelerometerQueue) {
+                        accelBatch.addAll(accelerometerQueue.take(batchSize))
+                    }
+
+                    synchronized(barometerQueue) {
+                        baroBatch.addAll(barometerQueue.take(batchSize))
+                    }
+
+                    processNextBatch(accelBatch, baroBatch)
+
+                    // Remove elements AFTER processing
+                    removeOldestData(accelerometerQueue, batchSize - carryOver)
+                    removeOldestData(barometerQueue, batchSize - carryOver)
+
                     isProcessing = false
                 }
             }
@@ -163,6 +170,7 @@ class SimulationViewModel @Inject constructor(
             }
         }
 //        Log.d("SimulationViewModel", "Trimmed queue from $originalSize to ${queue.size}")
+        Log.d("SimulationViewModel", "New queue size: ${queue.size}")
     }
 
     fun setSimulatedData(dataStreams: Map<CSVDataLoader.DataType, MutableList<List<Pair<Long, DoubleArray>>>>) {
